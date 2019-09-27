@@ -1,0 +1,120 @@
+(* 
+	pub_sub.8th
+ 
+  Publish/Subscribe system
+ 
+ Copyright C 2019 by G3UKB Bob Cowdery
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ at your option any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ 
+  The author can be reached by email at:   
+     bob@bobcowdery.plus.com
+     
+  The public interface can be called from any task. 
+*)
+
+\ ========================================
+\ Testing only
+true var, pub_sub_test
+
+\ ----------------------------------
+pub_sub_test @ #if
+	\ Includes
+	\ needs debug/sed
+	\ true SED-CHECK
+#then
+\ ========================================
+
+\ Set namespace
+ns: fr.ps
+with: fr.gs
+
+\ ===============================================================================
+\ ===============================================================================
+\ PRIVATE
+\ Convention: private words start __
+\ ===============================================================================
+
+\ ========================================
+\ Topic/Subscriber reference
+
+\ Holder for subscriber references
+\ Global var, requires lock semantics
+{} var, __ps
+
+\ ----------------------------------
+\ Locked var
+: __ps_lock@
+	__ps lock @ ;
+
+\ ----------------------------------
+\ Unlocked var	
+: __ps_unlock
+	__ps unlock drop ;
+	
+\ ----------------------------------
+\ Is locked	
+: __ps_islocked
+	__ps locked? nip ;
+	
+\ ===============================================================================
+\ ===============================================================================
+\ PUBLIC Call level Interface
+\ ===============================================================================
+
+: subscribe	SED: s w s --
+	\ in:		s - topic to subscribe to 	
+	\				w - word to invoke in task
+	\				s - task name to publish to
+	\ out:	none
+	__ps_lock@ 
+	1 pick m:exists? not if	\ t-name word topic ps
+		\ Topic does not exist so create
+		a:new 4 pick a:push 3 pick a:push	\ t-name word topic ps [t-name, w]
+		a:new swap a:push	\ t-name word topic ps [[t-name, w]]
+		swap 2 pick rot m:!	\ t-name word topic ps
+	else
+		\ Topic exists
+		1 pick m:@ \ t-name word topic ps [[t-name, w], ...]
+		a:new 5 pick a:push 4 pick a:push \ t-name word topic ps [[t-name, w], ...] [t-name, w]
+		a:push \ t-name word topic ps [[t-name, w], ... , [t-name, w]] 
+	then
+	__ps_unlock
+;
+	
+
+\ ========================================
+\ Reset namespace
+ns: user
+
+\ ===============================================================================
+\ ===============================================================================
+\ Testing
+\ ===============================================================================
+
+pub_sub_test @ #if
+	with: fr.ps
+	
+	: w
+		"Called" log
+	;
+	
+	"Task-1" ' w "Topic-1" subscribe
+	__ps @ . cr
+	"Task-2" ' w "Topic-1" subscribe
+	__ps @ . cr
+	bye
+	
+#then
+	
