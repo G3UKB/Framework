@@ -1,0 +1,409 @@
+(* 
+	gen_server.8th
+ 
+  A general purpose server to be used for all tasks that require the
+  messaging infrastructure.
+ 
+ Copyright C 2019 by G3UKB Bob Cowdery
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ at your option any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ 
+  The author can be reached by email at:   
+     bob@bobcowdery.plus.com
+     
+  
+  This module is loosly based on the erlang gen-server in that it emulates a 
+	process oriented message passing concurrency model.
+		
+	This is part of the generic framework in the namespace fr.*
+	
+  PUBLIC INTERFACE:
+  Main words for gen-server and message management:
+  
+  Create a new gen-server with the task name s. As everything is performed using the task name you should
+  never need to get the task ref. 
+  	gen_server_new	SED: s --
+  	
+  Ask the gen-server with task name s to terminate. The server is designed to always allow proper termination.	
+  	gen_server_term SED: s --
+  	
+  Send a message to the gen-server with task name s, calling word w with the opaque data *. The opaque data can be
+  any as it is passed directly to w. However, if a response is required the convention is [*, sender] where *
+  is the opaque data and the sender is the task name to send the response to [see later].
+  	msg! SED: s w * --
+  
+  A helper which will add the senders task name to the end of the array a, returning the new array.
+  	+sender SED: a -- a
+  
+  When the word w receives a message from msg! it must be aware of the structure of the opaque data and if a response
+  is required the array must include the sender name. In order to respond it should call response! with the sender 
+  name s, w the word to call with the response data and * the opaque response data.
+  	response!	SED: s w * --
+  	
+  The response is not automatically sent to word w from response!. It exists in the task-q of the message sender and 
+  must be retrieved with response@ by the sender. This should be done by the word that performed the msg! as its next action.
+  The word w in the response! call will then be called with the data. In this way separate words can be assigned to handle each 
+  response action.
+  	response@	SED: -- 
+  
+  Additional words for task registration and other utility actions:
+  If a task which is NOT a gen-server wishes to participate in the messaging framework it must be registered in the task registry
+  with t the task reference and s the task name.
+  	reg!	SED: t s --
+  
+  Remove a registration.
+  	reg_rm SED: s -- t
+  	
+  When it is required to terminate one or all tasks gen_server_term is used to terminate each task. However it is good practice 
+  to wait for the task to exit.
+  wait_single_task SED: s --
+  Wait_all SED: --
+  
+*)
+
+\ ========================================
+\ Testing only
+true var, gen_server_test
+
+\ ----------------------------------
+gen_server_test @ #if
+	\ Includes
+	\ needs debug/sed
+	\ true SED-CHECK
+#then
+\ ========================================
+
+\ Set namespace
+ns: fr.gs
+
+\ ===============================================================================
+\ ===============================================================================
+\ PRIVATE
+\ Convention: private words start __
+\ ===============================================================================
+
+\ ========================================
+\ Task reference and termination management
+
+\ Holder for task references
+\ Global var, requires lock semantics
+{} var, __task_dict
+
+\ ----------------------------------
+\ Locked var
+: __gs_lock@
+	__task_dict lock @ ;
+
+\ ----------------------------------
+\ Unlocked var	
+: __gs_unlock
+	__task_dict unlock drop ;
+	
+\ ----------------------------------
+\ Is locked	
+: __gs_islocked
+	__task_dict locked? nip ;
+
+\ ----------------------------------	
+\ Store task referance
+: __gs_reg!	SED: t s --
+	\ in: 	o: s - task name
+	\				1: t - task object
+	\ out:	none
+	__gs_lock@
+	swap rot m:! drop 
+	__gs_unlock ;
+
+\ ----------------------------------	
+\ Get task referance
+: __gs_reg@	SED: s -- t
+	\ in: 	0: s - task name
+	\ out:	0: t - task ref
+	__gs_lock@
+	swap m:@ nip 
+	__gs_unlock ;
+
+\ ----------------------------------	
+\ Remove task referance
+: __gs_reg_rm	SED: s -- t
+	\ in: 	0: s - task name
+	\ out:	none
+	__gs_lock@
+	swap m:- nip 
+	__gs_unlock ;
+
+\ ----------------------------------
+\ Wait for task to terminate
+: __gs_wait_task SED: s t --
+	\ in:		t - task ref 	(item from dict) 	
+	\				s - task name (key from dict)
+	\ out:	none
+	swap dup 
+	t:name@ s:= not if
+		\ Not the calling task, can't wait for ourselves!
+		"Waiting for task: %s" s:strfmt log 
+		t:wait 
+	then 
+;
+
+\ ----------------------------------
+\ Terminate task
+\ This is called from the task to terminate itself
+\ It sets the run task var to false which is then tested within gen_server
+: __gs_do_term  SED: a --
+	\ in: 	0: []
+	\ out:	none
+	drop false t:name@ "_run" s:+ t:!
+;
+
+\ ========================================
+\ GEN-SERVER
+
+\ ----------------------------------
+\ Process 1 item from task Q	
+: __gs_proc_q	SED: --
+	t:qlen 0 n:= if
+		"Warning gen-server queue was empty when processing [" t:name@ s:+ "]!" s:+ log 
+	else 
+		t:pop null? if
+			drop "Warning gen-server queue returned null [" t:name@ s:+ "]!" s:+ log
+		else
+			\ Message to process, just send data part
+			"data" m:@ swap "cb" m:@ nip w:exec
+		then
+	then ;
+	
+\ ----------------------------------
+\ Task entry point for all generic servers
+: __gen_server	 SED: s t --
+	\ in: 	0 t: calling task
+	\				1 s: this task name
+	\ out:	none
+	\ Assign name and store in registry
+	>r dup t:name! t:curtask swap __gs_reg!
+	
+	\ Set us in the run state using a task variable
+	true t:name@ "_run" s:+ t:!
+	
+	\ Set q to return null on empty
+	\ Note, should not happen
+	t:getq false q:throwing drop
+	\ Wake up main thread which is waiting for us to finish initialisation
+	r> t:notify
+	
+	\ Loop while run enabled
+	repeat
+		\ Wait for a wake up notify
+		-1 t:q-wait
+		' __gs_proc_q t:qlen
+		\ Check q length
+		\ dup 1 n:> if "Q: " . t:qlen . cr cr then 
+		times
+		\ Check for exit
+		t:name@ "_run" s:+ t:@
+		\ Check for stack problem, only the T value should be on stack at this point.
+		depth 2 n:> if
+			"Task " t:name@ s:+ " warning - data stack growing [" s:+ depth 2 n:- >s s:+ "]!" s:+ log
+		then
+	while!
+	\ Exit message
+	t:name@ " - exiting... [" s:+ depth >s s:+ "]" s:+ log ;
+
+\ ===============================================================================
+\ ===============================================================================
+\ PUBLIC Call level Interface
+\ ===============================================================================
+
+\ Make a new server
+: gen_server_new	SED: s -- 
+	\ in: 	0 s: new task name
+	\ out:	none
+	\ Create the new task
+	t:curtask 2 ' __gen_server t:task-n
+	\ Wait for it to complete registration
+	-1 sleep drop
+;
+
+\ ----------------------------------
+\ Register an external task
+: reg!	SED: t s --
+	__gs_reg! ;
+
+\ ----------------------------------
+\ Remove an external task
+: reg_rm	SED: s -- t
+	__gs_reg_rm ;
+
+\ ----------------------------------
+\ Wait for task to terminate
+: wait_single_task	SED: s --
+	dup >r "Waiting for task: " swap s:+ log
+	__gs_lock@
+	r@ m:@ t:wait
+	r> m:-
+	__gs_unlock drop ;
+
+\ ----------------------------------
+\ Wait for all tasks to terminate
+: wait_all	SED: --
+	__gs_lock@
+	' __gs_wait_task m:each
+	1 sleep
+	__gs_unlock drop 2drop ;
+
+\ ========================================
+\ Message management
+
+\ ----------------------------------
+\ Message send to a given word on a given task name queue
+: msg!	SED: s w * --
+	\ in:		* - opaque data to send 	
+	\				w - word to invoke in task
+	\				s - task name
+	\ out:	none
+	\ Word to invoke under the "cb" key and data under the "data" key
+	\ The data is cloned before the send as it must be detached from the current task pool
+	m:new "cb" 3 pick m:! "data" 2 pick m:! nip nip
+	\ Clone the whole message structure and push to the task q
+	const
+	\ Get task for name and lock task-dict
+	swap __gs_lock@ 
+	swap m:@ nip
+	\ Push message to task q
+	dup rot t:push 
+	t:q-notify 
+	\ Release lock
+	__gs_unlock
+;
+
+\ ----------------------------------
+\ Add sender to message
+: +sender	SED:	a -- a
+	\ in: 	0: a - message array
+	\ out: 	0: a - [sender name for response]
+	t:name@ a:push 
+;
+	
+\ ========================================
+\ Response management
+
+\ ----------------------------------
+\ Get task response for synchronous sends
+: response@	SED: -- 
+	\ in: 	none
+	\ out: 	0: * - opaque response data
+	t:pop null? if
+		\ Nothing yet, so wait a while
+		drop 1.0 t:q-wait t:pop null? if 
+			drop "Timeout waiting for task response!" log ;;
+		then
+	then
+	\ Data to process
+	"data" m:@ swap "cb" m:@ nip w:exec
+;
+
+\ ----------------------------------
+\ Push response data to sender
+: __responder msg! ;
+: response!	SED: s w * --
+	\ in:		* - opaque data to send 	
+	\				w - word to invoke in task
+	\				s - task name
+	\ out:	none
+	\ We send response via a transient task otherwsie we would deadlock
+	' __responder t:task-n t:wait 
+;
+
+\ ========================================
+\ Task termination
+\ ----------------------------------
+\ Ask task to terminate
+: gen_server_term SED: s --
+	\ We send an empty message to __gs_do_term which will self terminate
+	' __gs_do_term a:new msg!
+;
+
+\ ========================================
+\ Reset namespace
+ns: user
+
+\ ===============================================================================
+\ ===============================================================================
+\ Testing
+\ ===============================================================================
+
+gen_server_test @ #if
+	with: fr.gs
+	
+	\ Response calls back here
+	: w1
+		"Response callback to " . t:name@ . " from " . swap . " with " . . cr
+		ns:m pool-clear ns:a pool-clear
+	;
+	
+	\ Called by REPL and response to REPL
+	: w
+		t:name@ . " called w" . cr
+		1 a:@ nip ' w1 3 3 response!
+		ns:m pool-clear ns:a pool-clear
+	;
+	
+	\ Must register REPL in the task repos to be able to reply
+	t:curtask t:name@ reg!
+	\ Set q to null on empty
+	t:getq false q:throwing drop
+	
+	\ Create a number of tasks
+	: create_task \ n --
+		"Task-" swap >s s:+ gen_server_new
+	;
+	
+	: create_tasks
+		' create_task 1 100 loop
+	;
+	
+	\ Terminate tasks
+	: term_task \ n --
+		"Task-" swap >s s:+ gen_server_term drop
+	;
+
+	: term_tasks
+		' term_task 1 100 loop
+	;
+	
+	\ Send messages and expect response
+	: send_message	\ n --
+		cr "Task " . t:name@ .  " sending to " . dup . cr
+		"Task-" swap >s s:+ ' w a:new 1 a:push +sender msg!
+		0.01 sleep
+		response@
+	;
+		
+	: send_messages	\ n --
+		' send_message 1 100 loop drop
+	;
+	
+	: repeat_messages	\ --
+			' send_messages 1 100 loop
+	;
+	
+	\ Main test
+	create_tasks
+	repeat_messages
+	term_tasks
+	wait_all
+	"Test complete" log
+	bye
+#then
+	
