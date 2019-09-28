@@ -21,7 +21,10 @@
   The author can be reached by email at:   
      bob@bobcowdery.plus.com
      
-  The public interface can be called from any task. 
+  The public interface can be called from any task.
+  Subscribers subscribe to a topic and provide a task name and a word to call.
+  Publishers publish to a topic with data to end via a gen-server. There are no
+  direct calls. All data is sent via messages to the subscribing tasks.
 *)
 
 \ ========================================
@@ -32,8 +35,8 @@ true var, pub_sub_test
 pub_sub_test @ #if
 	\ Includes
 	"gen_server.8th" f:include
-	\ needs debug/sed
-	\ true SED-CHECK
+	needs debug/sed
+	true SED-CHECK
 	\ dbg:line-info
 #then
 
