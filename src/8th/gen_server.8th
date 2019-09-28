@@ -74,13 +74,14 @@
 
 \ ========================================
 \ Testing only
-false var, gen_server_test
+true var, gen_server_test
 
 \ ----------------------------------
 gen_server_test @ #if
 	\ Includes
-	\ needs debug/sed
-	\ true SED-CHECK
+	needs debug/sed
+	true SED-CHECK
+	\ needs debug/trace
 #then
 \ ========================================
 
@@ -387,7 +388,7 @@ gen_server_test @ #if
 		dup t:name@ "Task %s sending to %d" s:strfmt log 
 		"Task-" swap >s s:+ ' w a:new 1 a:push +sender msg!
 		0.01 sleep
-		drop response@
+		response@
 	;
 		
 	: send_messages	\ n --
@@ -395,7 +396,7 @@ gen_server_test @ #if
 	;
 	
 	: repeat_messages	\ --
-			' send_messages 1 1 loop
+		' send_messages 1 1 loop
 	;
 	
 	\ Main test

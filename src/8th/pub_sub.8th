@@ -32,8 +32,8 @@ true var, pub_sub_test
 pub_sub_test @ #if
 	\ Includes
 	"gen_server.8th" f:include
-	needs debug/sed
-	true SED-CHECK
+	\ needs debug/sed
+	\ true SED-CHECK
 	\ dbg:line-info
 #then
 
@@ -160,6 +160,14 @@ pub_sub_test @ #if
 		"Called receiver2 with %s" s:strfmt log
 	;
 	
+	: receiver3	SED: * --
+		"Called receiver3 with %s" s:strfmt log
+	;
+		
+	: receiver4	SED: * --
+		"Called receiver4 with %s" s:strfmt log
+	;
+	
 	\ Subscribers
 	: subscriber1 SED: * --
 		drop t:name@ ' receiver1 "Topic-1" subscribe
@@ -167,6 +175,14 @@ pub_sub_test @ #if
 	
 	: subscriber2 SED: * --
 		drop t:name@ ' receiver2 "Topic-2" subscribe
+	;
+	
+	: subscriber3 SED: * --
+		drop t:name@ ' receiver3 "Topic-3" subscribe
+	;
+		
+	: subscriber4 SED: * --
+		drop t:name@ ' receiver4 "Topic-4" subscribe
 	;
 	
 	\ Publishers
@@ -178,16 +194,30 @@ pub_sub_test @ #if
 		drop "Data-2" "Topic-2" publish
 	;
 	
+	: publisher3 SED: * --
+		drop "Data-3" "Topic-3" publish
+	;
+			
+	: publisher4 SED: * --
+		drop "Data-4" "Topic-4" publish
+	;	
+	
 	\ Create tasks
 	"Task-1" gen_server_new
 	"Task-2" gen_server_new
+	"Task-3" gen_server_new
+	"Task-4" gen_server_new
 	\ Subscribe
 	"Task-1" ' subscriber1 null msg!
 	"Task-2" ' subscriber2 null msg!
+	"Task-3" ' subscriber3 null msg!
+	"Task-4" ' subscriber4 null msg!
 	1 sleep
 	\ Publish
 	"Task-1" ' publisher1 null msg!
 	"Task-2" ' publisher2 null msg!
+	"Task-3" ' publisher3 null msg!
+	"Task-4" ' publisher4 null msg!
 	1 sleep
 
 	bye
