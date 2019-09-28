@@ -32,11 +32,12 @@ true var, pub_sub_test
 pub_sub_test @ #if
 	\ Includes
 	"gen_server.8th" f:include
-	\ needs debug/sed
-	\ true SED-CHECK
+	needs debug/sed
+	true SED-CHECK
+	\ dbg:line-info
 #then
-\ ========================================
 
+\ ========================================
 \ Set namespace
 ns: fr.ps
 with: fr.gs
@@ -56,17 +57,17 @@ with: fr.gs
 
 \ ----------------------------------
 \ Locked var
-: __ps_lock@
+: __ps_lock@	SED: -- m
 	__ps lock @ ;
 
 \ ----------------------------------
 \ Unlocked var	
-: __ps_unlock
+: __ps_unlock	SED: --
 	__ps unlock drop ;
 	
 \ ----------------------------------
 \ Is locked	
-: __ps_islocked
+: __ps_islocked	SED: -- T
 	__ps locked? nip ;
 
 \ ========================================
@@ -77,7 +78,7 @@ with: fr.gs
 	\ in:		a - [task-name, w] 	
 	\				* - opaque data to send
 	\ out:	none
-	a:open	\ task-name w
+	a:open 	\ * task-name w
 	rot msg!
 ;
 	
@@ -106,7 +107,7 @@ with: fr.gs
 		a:push \ t-name word topic ps [[t-name, w], ... , [t-name, w]] 
 	then
 	__ps_unlock
-	drop 2drop
+	2drop 2drop
 ;
 
 \ ----------------------------------
@@ -120,10 +121,10 @@ with: fr.gs
 		\ No such topic
 		1 pick "Topic %s does not exist - ignoring" s:strfmt log 2drop
 	else
-		1 pick m:@ ' __dispatcher a:each!
+		1 pick m:@ nip nip ' __dispatcher a:each!
 	then
 	__ps_unlock
-	2 drop
+	2 drop drop
 ;	
 	
 \ ========================================
@@ -137,47 +138,44 @@ ns: user
 
 pub_sub_test @ #if
 	(*
-		For a minimal tes:
-		1. Create 2 gen-servers.
-		2. have 2 words that receive published messages and print the data.
-		4. Have two words that subscribe to a number of topics.
-		5. Send a message via each gen-server to words in 4.
-		6. Have 2 words that publish to the topics.
-		7. Send a message via each gen-server to words in 6.
-		8. The words in 2 should receive the messages.
-	
+		For a minimal test:
+		1. Have 2 words that receive published messages and print the data.
+		2. Have 2 words that subscribe to a topic.
+		3. Have 2 words that publish to a topic.
+		4. Create 2 gen-servers.
+		5. Send a message via each gen-server to words in 2.
+		6. Send a message via each gen-server to words in 3.
+		7. The words in 1 should receive the messages.
 	*)
 	
 	with: fr.gs
 	with: fr.ps
 	
-	\ Create gen-servers
-	
 	\ Receivers
-	: receiver1	SED: data
+	: receiver1	SED: * --
 		"Called receiver1 with %s" s:strfmt log
 	;
 	
-	: receiver2	SED: data
+	: receiver2	SED: * --
 		"Called receiver2 with %s" s:strfmt log
 	;
 	
 	\ Subscribers
-	: subscriber1
-		t:name@ ' receiver1 "Topic-1" subscribe
+	: subscriber1 SED: * --
+		drop t:name@ ' receiver1 "Topic-1" subscribe
 	;
 	
-	: subscriber2
-			t:name@ ' receiver2 "Topic-2" subscribe
+	: subscriber2 SED: * --
+		drop t:name@ ' receiver2 "Topic-2" subscribe
 	;
 	
 	\ Publishers
-	: publisher1
-		"Data-1" "Topic-1" publish
+	: publisher1 SED: * --
+		drop "Data-1" "Topic-1" publish
 	;
 		
-	: publisher2
-		"Data-2" "Topic-2" publish
+	: publisher2 SED: * --
+		drop "Data-2" "Topic-2" publish
 	;
 	
 	\ Create tasks

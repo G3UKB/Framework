@@ -284,7 +284,7 @@ ns: fr.gs
 	dup rot t:push 
 	t:q-notify 
 	\ Release lock
-	__gs_unlock
+	__gs_unlock drop
 ;
 
 \ ----------------------------------
@@ -321,8 +321,8 @@ ns: fr.gs
 	\				w - word to invoke in task
 	\				s - task name
 	\ out:	none
-	\ We send response via a transient task otherwsie we would deadlock
-	' __responder t:task-n t:wait 
+	\ We send response via a transient task otherwise we would deadlock
+	const 3 ' __responder t:task-n t:wait
 ;
 
 \ ========================================
@@ -348,14 +348,14 @@ gen_server_test @ #if
 	
 	\ Response calls back here
 	: w1
-		"Response callback to " . t:name@ . " from " . swap . " with " . . cr
+		a:open t:name@ "Response callback to: %s from %s with %d" s:strfmt log 
 		ns:m pool-clear ns:a pool-clear
 	;
 	
 	\ Called by REPL and response to REPL
 	: w
-		t:name@ . " called w" . cr
-		1 a:@ nip ' w1 3 3 response!
+		t:name@ "%s called w" s:strfmt log 
+		1 a:@ nip ' w1 a:new 3 a:push t:name@ a:push response!
 		ns:m pool-clear ns:a pool-clear
 	;
 	
@@ -370,7 +370,7 @@ gen_server_test @ #if
 	;
 	
 	: create_tasks
-		' create_task 1 100 loop
+		' create_task 1 10 loop
 	;
 	
 	\ Terminate tasks
@@ -379,23 +379,23 @@ gen_server_test @ #if
 	;
 
 	: term_tasks
-		' term_task 1 100 loop
+		' term_task 1 10 loop
 	;
 	
 	\ Send messages and expect response
 	: send_message	\ n --
-		cr "Task " . t:name@ .  " sending to " . dup . cr
+		dup t:name@ "Task %s sending to %d" s:strfmt log 
 		"Task-" swap >s s:+ ' w a:new 1 a:push +sender msg!
 		0.01 sleep
-		response@
+		drop response@
 	;
 		
 	: send_messages	\ n --
-		' send_message 1 100 loop drop
+		' send_message 1 10 loop drop
 	;
 	
 	: repeat_messages	\ --
-			' send_messages 1 100 loop
+			' send_messages 1 1 loop
 	;
 	
 	\ Main test
