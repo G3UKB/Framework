@@ -31,6 +31,7 @@ true var, pub_sub_test
 \ ----------------------------------
 pub_sub_test @ #if
 	\ Includes
+	"gen_server.8th" f:include
 	\ needs debug/sed
 	\ true SED-CHECK
 #then
@@ -119,7 +120,7 @@ with: fr.gs
 		\ No such topic
 		1 pick "Topic %s does not exist - ignoring" s:strfmt log 2drop
 	else
-		1 pick m:@ ' __dispatch a:each!
+		1 pick m:@ ' __dispatcher a:each!
 	then
 	__ps_unlock
 	2 drop
@@ -135,17 +136,62 @@ ns: user
 \ ===============================================================================
 
 pub_sub_test @ #if
+	(*
+		For a minimal tes:
+		1. Create 2 gen-servers.
+		2. have 2 words that receive published messages and print the data.
+		4. Have two words that subscribe to a number of topics.
+		5. Send a message via each gen-server to words in 4.
+		6. Have 2 words that publish to the topics.
+		7. Send a message via each gen-server to words in 6.
+		8. The words in 2 should receive the messages.
+	
+	*)
+	
 	with: fr.gs
 	with: fr.ps
 	
-	: w
-		"Called" log
+	\ Create gen-servers
+	
+	\ Receivers
+	: receiver1	SED: data
+		"Called receiver1 with %s" s:strfmt log
 	;
 	
-	"Task-1" ' w "Topic-1" subscribe
-	__ps @ . cr
-	"Task-2" ' w "Topic-1" subscribe
-	__ps @ . cr
+	: receiver2	SED: data
+		"Called receiver2 with %s" s:strfmt log
+	;
+	
+	\ Subscribers
+	: subscriber1
+		t:name@ ' receiver1 "Topic-1" subscribe
+	;
+	
+	: subscriber2
+			t:name@ ' receiver2 "Topic-2" subscribe
+	;
+	
+	\ Publishers
+	: publisher1
+		"Data-1" "Topic-1" publish
+	;
+		
+	: publisher2
+		"Data-2" "Topic-2" publish
+	;
+	
+	\ Create tasks
+	"Task-1" gen_server_new
+	"Task-2" gen_server_new
+	\ Subscribe
+	"Task-1" ' subscriber1 null msg!
+	"Task-2" ' subscriber2 null msg!
+	1 sleep
+	\ Publish
+	"Task-1" ' publisher1 null msg!
+	"Task-2" ' publisher2 null msg!
+	1 sleep
+
 	bye
 	
 #then

@@ -74,7 +74,7 @@
 
 \ ========================================
 \ Testing only
-true var, gen_server_test
+false var, gen_server_test
 
 \ ----------------------------------
 gen_server_test @ #if
