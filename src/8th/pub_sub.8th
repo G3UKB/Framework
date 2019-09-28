@@ -67,12 +67,26 @@ with: fr.gs
 \ Is locked	
 : __ps_islocked
 	__ps locked? nip ;
+
+\ ========================================
+\ Dispatcher
+\ Dispatch to a subscriber
+\ Note: pub/sub is a one way street, no responses allowed.
+: __dispatcher	SED: * a --
+	\ in:		a - [task-name, w] 	
+	\				* - opaque data to send
+	\ out:	none
+	a:open	\ task-name w
+	rot msg!
+;
 	
 \ ===============================================================================
 \ ===============================================================================
 \ PUBLIC Call level Interface
 \ ===============================================================================
 
+\ ----------------------------------
+\ Subscribe to a topic	
 : subscribe	SED: s w s --
 	\ in:		s - topic to subscribe to 	
 	\				w - word to invoke in task
@@ -91,9 +105,26 @@ with: fr.gs
 		a:push \ t-name word topic ps [[t-name, w], ... , [t-name, w]] 
 	then
 	__ps_unlock
+	drop 2drop
 ;
-	
 
+\ ----------------------------------
+\ Publish to a topic	
+: publish	SED: * s --
+	\ in:		s - topic to publish to 	
+	\				* - opaque data to send
+	\ out:	none	
+	__ps_lock@ 
+	1 pick m:exists? not if
+		\ No such topic
+		1 pick "Topic %s does not exist - ignoring" s:strfmt log 2drop
+	else
+		1 pick m:@ ' __dispatch a:each!
+	then
+	__ps_unlock
+	2 drop
+;	
+	
 \ ========================================
 \ Reset namespace
 ns: user
@@ -104,6 +135,7 @@ ns: user
 \ ===============================================================================
 
 pub_sub_test @ #if
+	with: fr.gs
 	with: fr.ps
 	
 	: w
