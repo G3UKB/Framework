@@ -82,9 +82,13 @@ gen_server_test @ #if
 	\ needs debug/sed
 	\ true SED-CHECK
 	\ needs debug/trace
+	\ dbg:line-info
 #then
 \ ========================================
 
+\ needs debug/sed
+\ true SED-CHECK
+	
 \ Set namespace
 ns: fr.gs
 

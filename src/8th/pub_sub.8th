@@ -35,8 +35,8 @@ true var, pub_sub_test
 pub_sub_test @ #if
 	\ Includes
 	"gen_server.8th" f:include
-	needs debug/sed
-	true SED-CHECK
+	\ needs debug/sed
+	\ true SED-CHECK
 	\ dbg:line-info
 #then
 
@@ -222,7 +222,13 @@ pub_sub_test @ #if
 	"Task-3" ' publisher3 null msg!
 	"Task-4" ' publisher4 null msg!
 	1 sleep
-
+	"Task-1" gen_server_term
+	"Task-2" gen_server_term
+	"Task-3" gen_server_term
+	"Task-4" gen_server_term
+	
+	wait_all
+	"Test complete" log
 	bye
 	
 #then
