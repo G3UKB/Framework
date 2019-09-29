@@ -2,7 +2,7 @@
 	struct_manip.8th
  
  Structure manipulation
- Copyright C 2018 by G3UKB Bob Cowdery
+ Copyright C 2019 by G3UKB Bob Cowdery
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
  the Free Software Foundation; either version 2 of the License, or
@@ -29,6 +29,15 @@
 	
 	PUBLIC INTERFACE:
 	
+	Get the value of the element on the path given by a from the arbitrary structure *.
+	val@	SED: * a -- *
+	
+	Get the value of the element on the path given by a at index given by a from the arbitrary structure *.
+	idx_val@	SED: * a a -- *
+	
+	Set or Create the value given by the path a in the structure * with the value * at the index or key *.
+	val!	SED: * a * * -- 
+	
 *)
 
 \ ========================================
@@ -53,7 +62,6 @@ ns: fr.sm
 \ ===============================================================================
 
 \ ========================================
-\ Helpers
 \ Dereference the next level in the structure
 : __level@	SED: * n * -- *
 	\ in:		* - key or index to the next element 		
@@ -118,7 +126,7 @@ ns: fr.sm
 	\				* - arbitrary structure	
 	\ out:	* - new structure
 	\ Get target structure
-	.s 3 pick 3 pick val@
+	3 pick 3 pick val@
 	\ Get idx or key
 	2 pick dup >kind ns:s n:= if
 		\ We have 'm key'
@@ -131,110 +139,81 @@ ns: fr.sm
 	2drop 2drop drop
 ;
 
+\ ========================================
+\ Reset namespace
+ns: user
+
 \ ===============================================================================
 \ ===============================================================================
 \ Testing
 \ ===============================================================================
 
 struct_manip_test @ #if
+	with: fr.sm
 	4 json-pretty
+	
+	\ Test structures
+	[
+		["val-1", "val-2", "val-3"],
+		["outer", ["val-1", "val-2", "val-3"]],
+		["outer", "inner", ["val-1", "val-2", "val-3"]]
+	] var, array-1
+	
 	{
-		"general" : {
-		\	key						src			index/val 	SoD			option list			
-			"smplrate" : 	[false, [0, 				false, 	["48000", "96000", "192000"]]],
-			"numrx" : 		[false, [0, 				false, 	["1", "2", "3"]]],
-			"blksz" : 		[false, [1, 				false, 	["512", "1024", "2048", "4096"]]],
-			"duplex" : 		[false, [false, 		false, 	[]]],
-			"enabletx" : 	[false, [false, 		false, 	[]]]
+		"struct-1" : {	
+			"key-1" : 	["val-1", "val-2", "val-3"],
+			"key-2" : 	["outer", ["val-1", "val-2", "val-3"]],
+			"key-3" : 	["outer", "inner", ["val-1", "val-2", "val-3"]],
+			"key-4" : 	{"inner-key" : ["val-1", "val-2", "val-3"]},
+			"key-5" : 	{"inner-key" : {"inner-key-1" : ["val-1", "val-2", "val-3"]}}
+		},
+		"struct-2" : {	
+				"key-1" : 	[0, ["val-1", "val-2", "val-3"]],
+				"key-2" : 	[1, "inner", ["val-1", "val-2", "val-3"]],
+				"key-3" : 	{"inner-key" : [1,["val-1", "val-2", "val-3"]]},
+				"key-4" : 	[2, {"inner-key-1" : ["val-1", "val-2", "val-3"]}]
 		}
-	} var, struct
-
-	{
-			\ HPSDR Protocol-1 only supports 3 radios
-			\ More can be added into the array as required
-			"radio-state" : [
-				[
-					\ src						SoD
-					false, [null, false, 
-					{
-						"display-width": 0,
-						"display-height": 0,
-						"freq": 7100000,
-						"mode": 0 ,
-						"filter": 0 ,
-						"agc": 0 ,
-						"attn": 0 ,
-						"hf-preamp": 0 ,
-						"6m-preamp": 0 ,
-						"audio-gain": 50
-					} ]
-				],
-				[
-					\ src						SoD
-					false, [null, false, 
-					{
-						"display-width": 0,
-						"display-height": 0,
-						"freq": 7100000,
-						"mode": 0 ,
-						"filter": 0 ,
-						"agc": 0 ,
-						"attn": 0 ,
-						"hf-preamp": 0 ,
-						"6m-preamp": 0 ,
-						"audio-gain": 50
-					} ]
-				],
-				[
-					\ src						SoD
-					false, [null, false, 
-					{
-						"display-width": 0,
-						"display-height": 0,
-						"freq": 7100000,
-						"mode": 0 ,
-						"filter": 0 ,
-						"agc": 0 ,
-						"attn": 0 ,
-						"hf-preamp": 0 ,
-						"6m-preamp": 0 ,
-						"audio-gain": 50
-					} ]
-				]
-			]
-		} var, struct1
+	} var, map-1
 
 	\ =========================================================================
 	\ Getter examples
 	: getter_examples
-		\ Block size option list
-		struct @ ["general","blksz",1,2] val@ . cr
-		\ Numrx value
-		\ struct @ ["general","numrx",1,0] val@ . cr
-		\ Duplex SoD flag
-		\ struct @ ["general","duplex",1,1] val@ . cr
-		\ Samplerate value
-		struct @ ["general","smplrate",1,2] ["general","smplrate",1,0] idx_val@ . cr
-		\ Part structure as delivered by some listeners
-		\ [0, false, ["48000", "96000", "192000"]] [2] val@ . cr
-		\ [0, false, ["48000", "96000", "192000"]] [0] val@ . cr
-		\ [0, false, ["48000", "96000", "192000"]] [2] [0] idx_val@ . cr
+		"Array access" . cr
+		array-1 @ [0,1] val@ . cr
+		array-1 @ [1,1,1] val@ . cr
+		array-1 @ [2,1] val@ . cr
+		array-1 @ [2,2,2] val@ . cr
+		
+		"Map/Array access" . cr
+		map-1 @ ["struct-1","key-1",2] val@ . cr
+		map-1 @ ["struct-1","key-2",1,2] val@ . cr
+		map-1 @ ["struct-1","key-3",1] val@ . cr
+		map-1 @ ["struct-1","key-3",2,2] val@ . cr
+		map-1 @ ["struct-1","key-4","inner-key"] val@ . cr
+		map-1 @ ["struct-1","key-4","inner-key",1] val@ . cr
+		map-1 @ ["struct-1","key-5","inner-key","inner-key-1"] val@ . cr
+		map-1 @ ["struct-1","key-5","inner-key","inner-key-1",1] val@ . cr
+		
+		"Indexed Map/Array access" . cr
+		map-1 @ ["struct-2","key-1",1] ["struct-2","key-1",0] idx_val@ . cr
+		map-1 @ ["struct-2","key-2",2] ["struct-2","key-2",0] idx_val@ . cr
+		map-1 @ ["struct-2","key-3","inner-key",1] ["struct-2","key-3","inner-key",0] idx_val@ . cr
+		map-1 @ ["struct-2","key-4",1,"inner-key-1"] ["struct-2","key-4",0] idx_val@ . cr
 	;
 
 	\ =========================================================================
 	\ Setter examples
 	: setter_examples
-		\ Sample rate SoD flag
-		\ struct @ ["general","smplrate",1] 1 true val! struct @ ["general","smplrate"] val@ . cr
-		\ struct @ ["general","numrx",1] 1 true val! struct @ ["general","numrx"] val@ . cr
-		\ struct @ ["general","blksz",1] 1 true val! struct @ ["general","blksz"] val@ . cr
-		\ struct @ ["general","duplex",1] 1 true val! struct @ ["general","duplex"] val@ . cr
-		\ struct @ ["general","enabletx",1] 1 true val! struct @ ["general","enabletx"] val@ . cr
-
-		\ struct1 @ ["radio-state", 0 ] 0 true val!
-		struct1 @ ["radio-state", 0 , 1 , 2 ] "freq" 8000000 val!	
-		\ struct1 @ ["radio-state", 0 , 1 ] 1 true val!
-		struct1 @ . cr
+		"Array setters" . cr
+		array-1 @ [0] 0 "updated" val!
+		array-1 @ [1,1] 1 "updated" val!
+		array-1 @ . cr
+		
+		"Map/Array setters" . cr
+		map-1 @ ["struct-1","key-1"] 0 "updated" val!
+		map-1 @ ["struct-1","key-4"] "inner-key-1" [1,2,3,4] val!
+		map-1 @ ["struct-1","key-4"] "inner-key" [5,6,7,8] val!
+		map-1 @ . cr
 	;
 
 	: run_test
@@ -245,9 +224,11 @@ struct_manip_test @ #if
 	;
 
 	: run_tests
-		' run_test 1 1 loop
+		' run_test 1 100 loop
 	;
 	
 	run_tests
+	
+	"Test complete" log
 	bye
 #then
