@@ -1,0 +1,253 @@
+(* 
+	struct_manip.8th
+ 
+ Structure manipulation
+ Copyright C 2018 by G3UKB Bob Cowdery
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ at your option any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ 
+  The author can be reached by email at:   
+     bob@bobcowdery.plus.com
+     
+  This module provides a data driven way to get/set fields in any structure consisting
+	of arbitrary nested arrays and maps. This prevents a stream of m:@, a:@, m:! etc with
+	stack manipulations which gets very hard to follow. The alternative to this generic method
+	is a set of words to get/set specific fields in specific structures.
+
+	This is part of the framework in the namespace fr.*:.
+	
+	PUBLIC INTERFACE:
+	
+*)
+
+\ ========================================
+\ Testing only
+true var, struct_manip_test
+
+struct_manip_test @ #if
+	\ Includes
+	needs debug/sed
+	true SED-CHECK
+#then
+
+\ ========================================
+\ Set namespace
+ns: fr.sm
+
+\ ========================================
+
+\ ===============================================================================
+\ PRIVATE
+\ Convention: private words start __
+\ ===============================================================================
+
+\ ========================================
+\ Helpers
+\ Dereference the next level in the structure
+: __level@	SED: * n * -- *
+	\ in:		* - key or index to the next element 		
+	\				n - index into path array
+	\				* - arbitrary structure
+	\ out:	* - arbitrary next element, scalar or structure
+	\ Drop unwanted index
+	nip
+	\ Do we have an index or a key
+	\ i.e are we looking in a dict or an array
+	dup >kind ns:s n:= if	
+		\ String, so a map key
+		m:@	nip	
+	else
+		\ Number so an array index
+		a:@	nip
+	then ;
+
+\ ===============================================================================
+\ PUBLIC
+\ ===============================================================================
+
+\ ========================================
+\ Getter words
+
+\ Dereference the structure from a path descriptor, returning a field
+: val@	SED: * a -- *
+	\ in:		a - path to an element [s|n, s|n, s|n ...] 	
+	\				* - arbitrary structure	
+	\ out:	* - arbitrary element, scalar or structure
+	' __level@ a:each
+	drop 
+;
+
+\ ----------------------------------
+\	1. Dereference the structure from path-2 to obtain an index value then
+\ 2. Dereference the structure from path-1 to obtain an array
+\ 3. Return the indexed element from the array
+: idx_val@	SED: * a a -- *
+	\ in:		a - path-2 to an element to yield an index or an index 	
+	\				a - path-1 to an element [s|n, s|n, s|n ...] 
+	\				* - arbitrary structure	
+	\ out:	* - arbitrary element, scalar or structure
+	\ Deref using path-2 (index) and stash result to r
+	2 pick swap val@ >r
+	\ Deref using path-1
+	val@
+	\ Now index the value list returned
+	r> a:@
+	\ Clean up
+	nip 
+;
+
+\ ========================================
+\ Setter words
+
+\ Update a value in the given struct with value,ix at path descriptor
+: val!	SED: * a * * -- 
+	\ in:		* - value to put at index or key
+	\				* - index or key to an element in the resulting structure 	
+	\				a - path to an element [s|n, s|n, s|n ...] 
+	\				* - arbitrary structure	
+	\ out:	* - new structure
+	\ Get target structure
+	.s 3 pick 3 pick val@
+	\ Get idx or key
+	2 pick dup >kind ns:s n:= if
+		\ We have 'm key'
+		2 pick m:!
+	else
+		\ We have 'a idx'
+		2 pick a:!
+	then
+	\ Clean up
+	2drop 2drop drop
+;
+
+\ ===============================================================================
+\ ===============================================================================
+\ Testing
+\ ===============================================================================
+
+struct_manip_test @ #if
+	4 json-pretty
+	{
+		"general" : {
+		\	key						src			index/val 	SoD			option list			
+			"smplrate" : 	[false, [0, 				false, 	["48000", "96000", "192000"]]],
+			"numrx" : 		[false, [0, 				false, 	["1", "2", "3"]]],
+			"blksz" : 		[false, [1, 				false, 	["512", "1024", "2048", "4096"]]],
+			"duplex" : 		[false, [false, 		false, 	[]]],
+			"enabletx" : 	[false, [false, 		false, 	[]]]
+		}
+	} var, struct
+
+	{
+			\ HPSDR Protocol-1 only supports 3 radios
+			\ More can be added into the array as required
+			"radio-state" : [
+				[
+					\ src						SoD
+					false, [null, false, 
+					{
+						"display-width": 0,
+						"display-height": 0,
+						"freq": 7100000,
+						"mode": 0 ,
+						"filter": 0 ,
+						"agc": 0 ,
+						"attn": 0 ,
+						"hf-preamp": 0 ,
+						"6m-preamp": 0 ,
+						"audio-gain": 50
+					} ]
+				],
+				[
+					\ src						SoD
+					false, [null, false, 
+					{
+						"display-width": 0,
+						"display-height": 0,
+						"freq": 7100000,
+						"mode": 0 ,
+						"filter": 0 ,
+						"agc": 0 ,
+						"attn": 0 ,
+						"hf-preamp": 0 ,
+						"6m-preamp": 0 ,
+						"audio-gain": 50
+					} ]
+				],
+				[
+					\ src						SoD
+					false, [null, false, 
+					{
+						"display-width": 0,
+						"display-height": 0,
+						"freq": 7100000,
+						"mode": 0 ,
+						"filter": 0 ,
+						"agc": 0 ,
+						"attn": 0 ,
+						"hf-preamp": 0 ,
+						"6m-preamp": 0 ,
+						"audio-gain": 50
+					} ]
+				]
+			]
+		} var, struct1
+
+	\ =========================================================================
+	\ Getter examples
+	: getter_examples
+		\ Block size option list
+		struct @ ["general","blksz",1,2] val@ . cr
+		\ Numrx value
+		\ struct @ ["general","numrx",1,0] val@ . cr
+		\ Duplex SoD flag
+		\ struct @ ["general","duplex",1,1] val@ . cr
+		\ Samplerate value
+		struct @ ["general","smplrate",1,2] ["general","smplrate",1,0] idx_val@ . cr
+		\ Part structure as delivered by some listeners
+		\ [0, false, ["48000", "96000", "192000"]] [2] val@ . cr
+		\ [0, false, ["48000", "96000", "192000"]] [0] val@ . cr
+		\ [0, false, ["48000", "96000", "192000"]] [2] [0] idx_val@ . cr
+	;
+
+	\ =========================================================================
+	\ Setter examples
+	: setter_examples
+		\ Sample rate SoD flag
+		\ struct @ ["general","smplrate",1] 1 true val! struct @ ["general","smplrate"] val@ . cr
+		\ struct @ ["general","numrx",1] 1 true val! struct @ ["general","numrx"] val@ . cr
+		\ struct @ ["general","blksz",1] 1 true val! struct @ ["general","blksz"] val@ . cr
+		\ struct @ ["general","duplex",1] 1 true val! struct @ ["general","duplex"] val@ . cr
+		\ struct @ ["general","enabletx",1] 1 true val! struct @ ["general","enabletx"] val@ . cr
+
+		\ struct1 @ ["radio-state", 0 ] 0 true val!
+		struct1 @ ["radio-state", 0 , 1 , 2 ] "freq" 8000000 val!	
+		\ struct1 @ ["radio-state", 0 , 1 ] 1 true val!
+		struct1 @ . cr
+	;
+
+	: run_test
+		"Run: " . . cr
+		getter_examples
+		setter_examples
+		0.1 sleep
+	;
+
+	: run_tests
+		' run_test 1 1 loop
+	;
+	
+	run_tests
+	bye
+#then

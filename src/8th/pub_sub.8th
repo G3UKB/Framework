@@ -23,8 +23,28 @@
      
   The public interface can be called from any task.
   Subscribers subscribe to a topic and provide a task name and a word to call.
-  Publishers publish to a topic with data to end via a gen-server. There are no
+  Publishers publish to a topic with data to send via a gen-server. There are no
   direct calls. All data is sent via messages to the subscribing tasks.
+  
+  Note that this should be used for one way calls although there is nothing to
+  prevent a reply by agreement between sender and receiver [see gen_server].
+  
+  PUBLIC INTERFACE:
+	  
+  	Subscribe to a topic where s is the task name of the target task and w is the
+  	word to call in the target task and s is the topic to subscribe to. Topic names
+  	and task names are strings. Note that there is no registration of topics, if a 
+  	topic does not exist it will be created.
+  	
+  		subscribe	SED: s w s --
+  	
+  	Publish to a topic where * is the opaque data to send and s is the topic name. 
+  	If a topic does not exist a message will be logged but it won't fail.
+  	Subscribers should therefore subscribe before publishing starts. Note that this
+  	is asynchronous as publish will return once messages have been sent to all subscribers.
+  	
+  		publish	SED: * s --
+  	
 *)
 
 \ ========================================

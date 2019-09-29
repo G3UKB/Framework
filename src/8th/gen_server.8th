@@ -32,15 +32,18 @@
   Main words for gen-server and message management:
   
   Create a new gen-server with the task name s. As everything is performed using the task name you should
-  never need to get the task ref. 
+  never need to get the task ref.
+  
   	gen_server_new	SED: s --
   	
-  Ask the gen-server with task name s to terminate. The server is designed to always allow proper termination.	
+  Ask the gen-server with task name s to terminate. The server is designed to always allow proper termination.
+  
   	gen_server_term SED: s --
   	
   Send a message to the gen-server with task name s, calling word w with the opaque data *. The opaque data can be
   any as it is passed directly to w. However, if a response is required the convention is [*, sender] where *
   is the opaque data and the sender is the task name to send the response to [see later].
+  
   	msg! SED: s w * --
   
   A helper which will add the senders task name to the end of the array a, returning the new array.
@@ -49,24 +52,29 @@
   When the word w receives a message from msg! it must be aware of the structure of the opaque data and if a response
   is required the array must include the sender name. In order to respond it should call response! with the sender 
   name s, w the word to call with the response data and * the opaque response data.
+  
   	response!	SED: s w * --
   	
   The response is not automatically sent to word w from response!. It exists in the task-q of the message sender and 
   must be retrieved with response@ by the sender. This should be done by the word that performed the msg! as its next action.
   The word w in the response! call will then be called with the data. In this way separate words can be assigned to handle each 
   response action.
+  
   	response@	SED: -- 
   
   Additional words for task registration and other utility actions:
   If a task which is NOT a gen-server wishes to participate in the messaging framework it must be registered in the task registry
   with t the task reference and s the task name.
+  
   	reg!	SED: t s --
   
   Remove a registration.
+  
   	reg_rm SED: s -- t
   	
   When it is required to terminate one or all tasks gen_server_term is used to terminate each task. However it is good practice 
   to wait for the task to exit.
+  
   wait_single_task SED: s --
   Wait_all SED: --
   
