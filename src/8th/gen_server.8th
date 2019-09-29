@@ -94,9 +94,6 @@ gen_server_test @ #if
 #then
 \ ========================================
 
-\ needs debug/sed
-\ true SED-CHECK
-	
 \ Set namespace
 ns: fr.gs
 
