@@ -399,10 +399,11 @@ gen_server_test @ #if
 		
 	: send_messages	\ n --
 		' send_message 1 100 loop drop
+		\ .stats
 	;
 	
 	: repeat_messages	\ --
-		' send_messages 1 10 loop
+		' send_messages 1 100 loop
 	;
 	
 	\ Main test
