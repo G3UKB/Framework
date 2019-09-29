@@ -177,6 +177,14 @@ ns: fr.gs
 \ ========================================
 \ GEN-SERVER
 
+\ Task exceptions should come here so 'maybe' we will know which task failed.
+: __handler	SED: x -- rc
+	t:name@ "Task %s handler called with [%s]" s:strfmt log
+	\ We may be able to handle some exceptions by restarting task.
+	\ Return 0 which means invoke G:handler which will terminate the program.
+	0
+;
+
 \ ----------------------------------
 \ Process 1 item from task Q	
 : __gs_proc_q	SED: --
@@ -199,6 +207,9 @@ ns: fr.gs
 	\ out:	none
 	\ Assign name and store in registry
 	>r dup t:name! t:curtask swap __gs_reg!
+	
+	\ Set a task exception handler
+	' __handler t:handler
 	
 	\ Set us in the run state using a task variable
 	true t:name@ "_run" s:+ t:!
@@ -369,7 +380,7 @@ gen_server_test @ #if
 	\ Must register REPL in the task repos to be able to reply
 	t:curtask t:name@ reg!
 	\ Set q to null on empty
-	t:getq false q:throwing drop
+	t:getq false q:throwing
 	
 	\ Create a number of tasks
 	: create_task \ n --
@@ -377,7 +388,7 @@ gen_server_test @ #if
 	;
 	
 	: create_tasks
-		' create_task 1 100 loop
+		' create_task 1 100 loop drop
 	;
 	
 	\ Terminate tasks
@@ -403,7 +414,7 @@ gen_server_test @ #if
 	;
 	
 	: repeat_messages	\ --
-		' send_messages 1 100 loop
+		' send_messages 1 1000 loop
 	;
 	
 	\ Main test

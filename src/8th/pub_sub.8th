@@ -29,7 +29,7 @@
 
 \ ========================================
 \ Testing only
-true var, pub_sub_test
+false var, pub_sub_test
 
 \ ----------------------------------
 pub_sub_test @ #if
@@ -127,7 +127,7 @@ with: fr.gs
 		1 pick m:@ nip nip ' __dispatcher a:each!
 	then
 	__ps_unlock
-	2 drop drop
+	drop
 ;	
 	
 \ ========================================
