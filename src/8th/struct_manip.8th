@@ -22,8 +22,9 @@
      
   This module provides a data driven way to get/set fields in any structure consisting
 	of arbitrary nested arrays and maps. This prevents a stream of m:@, a:@, m:! etc with
-	stack manipulations which gets very hard to follow. The alternative to this generic method
-	is a set of words to get/set specific fields in specific structures.
+	stack manipulations which gets very hard to follow.
+	NOTE: If you only use this module to access arrays and structures then debugging invalid
+	access will be a lot easier as parameter checks are performed.
 
 	This is part of the framework in the namespace fr.*:.
 	
@@ -42,7 +43,7 @@
 
 \ ========================================
 \ Testing only
-false var, struct_manip_test
+true var, struct_manip_test
 
 struct_manip_test @ #if
 	\ Includes
@@ -62,6 +63,41 @@ ns: fr.sm
 \ ===============================================================================
 
 \ ========================================
+\ Check for sensible stack for array and map access words.
+\ Throw an exception if it looks wrong with all info we can obtain.
+
+: __a@	SED:  a n --  		
+	\	in:		n - index
+	\				a - target array
+	\ out:	a - indexed item
+	a:@
+;
+
+: __a!	SED:  a n * -- a 
+	\ in:		* - item to store at index in array 		
+	\				n - index
+	\				a - target array
+	\ out:	a - modified array
+	a:!
+;
+
+: __m@	SED:  m s -- m *	
+	\	in:		s - key
+	\				m - target map
+	\ out:	* - item from map
+	\				m -	target map
+	m:@
+;
+
+: __m!	SED:  m s * -- 
+	\ in:		* - item to store at kay in map 		
+	\				s - key
+	\				m - target map
+	\ out:	a - modified array
+	m:!
+;
+
+\ ========================================
 \ Dereference the next level in the structure
 : __level@	SED: * n * -- *
 	\ in:		* - key or index to the next element 		
@@ -74,10 +110,10 @@ ns: fr.sm
 	\ i.e are we looking in a dict or an array
 	dup >kind ns:s n:= if	
 		\ String, so a map key
-		m:@	nip	
+		__m@	nip	
 	else
 		\ Number so an array index
-		a:@	nip
+		__a@	nip
 	then ;
 
 \ ===============================================================================
@@ -110,7 +146,7 @@ ns: fr.sm
 	\ Deref using path-1
 	val@
 	\ Now index the value list returned
-	r> a:@
+	r> __a@
 	\ Clean up
 	nip 
 ;
@@ -130,10 +166,10 @@ ns: fr.sm
 	\ Get idx or key
 	2 pick dup >kind ns:s n:= if
 		\ We have 'm key'
-		2 pick m:!
+		2 pick __m!
 	else
 		\ We have 'a idx'
-		2 pick a:!
+		2 pick __a!
 	then
 	\ Clean up
 	2drop 2drop drop
@@ -205,7 +241,7 @@ struct_manip_test @ #if
 	\ Setter examples
 	: setter_examples
 		"Array setters" . cr
-		array @ [0] 0 "updated" val!
+		array @ [0] 1 "updated" val!
 		array @ [1,1] 1 "updated" val!
 		array @ . cr
 		
@@ -224,7 +260,7 @@ struct_manip_test @ #if
 	;
 
 	: run_tests
-		' run_test 1 100 loop
+		' run_test 1 1 loop
 	;
 	
 	run_tests

@@ -46,12 +46,12 @@
   
   	msg! SED: s w * --
   
-  A helper which will add the senders task name to the end of the array a, returning the new array.
-  	+sender SED: a -- a
+  A helper which will add the senders task name and word to call to the end of the array a, returning the new array.
+  	+sender SED: a w -- a
   
   When the word w receives a message from msg! it must be aware of the structure of the opaque data and if a response
-  is required the array must include the sender name. In order to respond it should call response! with the sender 
-  name s, w the word to call with the response data and * the opaque response data.
+  is required the array must include the sender name and word to call. In order to respond it should call response! 
+  with the sender name s, w the word to call with the response data and * the opaque response data.
   
   	response!	SED: s w * --
   	
@@ -312,10 +312,11 @@ ns: fr.gs
 
 \ ----------------------------------
 \ Add sender to message
-: +sender	SED:	a -- a
-	\ in: 	0: a - message array
-	\ out: 	0: a - [sender name for response]
-	t:name@ a:push 
+: +sender	SED:	a w -- a
+	\ in: 	0: w - word to call on response
+	\				1: a - message array [*]
+	\ out: 	0: a - [*, sender task name, w]
+	swap t:name@ a:push swap a:push
 ;
 	
 \ ========================================
@@ -378,7 +379,7 @@ gen_server_test @ #if
 	\ Called by REPL and response to REPL
 	: w
 		t:name@ "%s called w" s:strfmt log 
-		1 a:@ nip ' w1 a:new 3 a:push t:name@ a:push response!
+		1 a:@ swap 2 a:@ nip a:new 3 a:push t:name@ a:push response!
 		ns:m pool-clear ns:a pool-clear
 	;
 	
@@ -408,7 +409,7 @@ gen_server_test @ #if
 	\ Send messages and expect response
 	: send_message	\ n --
 		dup t:name@ "Task %s sending to %d" s:strfmt log 
-		"Task-" swap >s s:+ ' w a:new 1 a:push +sender msg!
+		"Task-" swap >s s:+ ' w a:new 1 a:push ' w1 +sender msg!
 		0.01 sleep
 		response@
 	;
@@ -419,7 +420,7 @@ gen_server_test @ #if
 	;
 	
 	: repeat_messages	\ --
-		' send_messages 1 1000 loop
+		' send_messages 1 1 loop
 	;
 	
 	\ Main test
