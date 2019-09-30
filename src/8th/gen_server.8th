@@ -333,7 +333,7 @@ ns: fr.gs
 			\ Data to process
 			"data" m:@ swap "cb" m:@ nip w:exec ;;
 		else
-			n:1- 0.01 sleep
+			drop n:1- 0.01 sleep
 		then
 	while drop	
 	"Timeout waiting for task response!" log
@@ -412,7 +412,6 @@ gen_server_test @ #if
 	: send_message	\ n --
 		dup t:name@ "Task %s sending to %d" s:strfmt log 
 		"Task-" swap >s s:+ ' w a:new 1 a:push ' w1 +sender msg!
-		0.01 sleep
 		response@
 	;
 		
