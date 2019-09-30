@@ -327,14 +327,16 @@ ns: fr.gs
 : response@	SED: -- 
 	\ in: 	none
 	\ out: 	0: * - opaque response data
-	t:pop null? if
-		\ Nothing yet, so wait a while
-		drop 1.0 t:q-wait t:pop null? if 
-			drop "Timeout waiting for task response!" log ;;
+	\ Spin a while as we won't get a notify 
+	100 repeat
+		t:pop null? not if
+			\ Data to process
+			"data" m:@ swap "cb" m:@ nip w:exec ;;
+		else
+			n:1- 0.01 sleep
 		then
-	then
-	\ Data to process
-	"data" m:@ swap "cb" m:@ nip w:exec
+	while drop	
+	"Timeout waiting for task response!" log
 ;
 
 \ ----------------------------------
@@ -394,7 +396,7 @@ gen_server_test @ #if
 	;
 	
 	: create_tasks
-		' create_task 1 100 loop drop
+		' create_task 1 1 loop drop
 	;
 	
 	\ Terminate tasks
@@ -403,7 +405,7 @@ gen_server_test @ #if
 	;
 
 	: term_tasks
-		' term_task 1 100 loop
+		' term_task 1 1 loop
 	;
 	
 	\ Send messages and expect response
@@ -415,7 +417,7 @@ gen_server_test @ #if
 	;
 		
 	: send_messages	\ n --
-		' send_message 1 100 loop drop
+		' send_message 1 1 loop drop
 		\ .stats
 	;
 	
