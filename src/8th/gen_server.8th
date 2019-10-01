@@ -329,11 +329,12 @@ ns: fr.gs
 	\ out: 	0: * - opaque response data
 	\ Spin a while as we won't get a notify 
 	100 repeat
-		t:pop null? not if
-			\ Data to process
-			"data" m:@ swap "cb" m:@ nip w:exec ;;
-		else
+		t:pop null? if
+			\ Keep going
 			drop n:1- 0.01 sleep
+		else
+			\ Data to process
+			nip "data" m:@ swap "cb" m:@ nip w:exec ;;
 		then
 	while drop	
 	"Timeout waiting for task response!" log
@@ -388,7 +389,7 @@ gen_server_test @ #if
 	\ Must register REPL in the task repos to be able to reply
 	t:curtask t:name@ reg!
 	\ Set q to null on empty
-	t:getq false q:throwing
+	t:getq false q:throwing \ drop - why do I need to leave the q on stack else crashes immediately on running test
 	
 	\ Create a number of tasks
 	: create_task \ n --
@@ -425,8 +426,8 @@ gen_server_test @ #if
 	;
 	
 	\ Main test
-	create_tasks
-	repeat_messages
+	create_tasks .s
+	repeat_messages .s
 	term_tasks
 	wait_all
 	"Test complete" log
