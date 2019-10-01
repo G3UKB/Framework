@@ -41,8 +41,8 @@
   	gen_server_term SED: s --
   	
   Send a message to the gen-server with task name s, calling word w with the opaque data *. The opaque data can be
-  any as it is passed directly to w. However, if a response is required the convention is [*, sender] where *
-  is the opaque data and the sender is the task name to send the response to [see later].
+  any as it is passed directly to w. However, if a response is required the convention is [*, sender, w] where *
+  is the opaque data and the sender is the task name to send the response to and w is the word to call [see later].
   
   	msg! SED: s w * --
   
@@ -224,7 +224,6 @@ ns: fr.gs
 	t:getq false q:throwing drop
 	\ Wake up main thread which is waiting for us to finish initialisation
 	r> t:notify
-	
 	\ Loop while run enabled
 	repeat
 		\ Wait for a wake up notify
@@ -373,12 +372,19 @@ ns: user
 gen_server_test @ #if
 	with: fr.gs
 	
+	\ Must register REPL in the task repos to be able to reply
+	t:curtask t:name@ reg!
+	\ Set q to null on empty
+	t:getq false q:throwing \ drop - why do I need to leave the q on stack else crashes immediately on running test
+
+	
 	\ Response calls back here
 	: w1
 		a:open t:name@ "Response callback to: %s from %s with %d" s:strfmt log 
 		ns:m pool-clear ns:a pool-clear
 	;
 	
+	ns: somenamespace
 	\ Called by REPL and response to REPL
 	: w
 		t:name@ "%s called w" s:strfmt log 
@@ -386,19 +392,15 @@ gen_server_test @ #if
 		ns:m pool-clear ns:a pool-clear
 	;
 	
-	\ Must register REPL in the task repos to be able to reply
-	t:curtask t:name@ reg!
-	\ Set q to null on empty
-	t:getq false q:throwing \ drop - why do I need to leave the q on stack else crashes immediately on running test
-	
 	\ Create a number of tasks
 	: create_task \ n --
 		"Task-" swap >s s:+ gen_server_new
 	;
 	
 	: create_tasks
-		' create_task 1 1 loop drop
+		' create_task 1 100 loop drop
 	;
+	ns: user
 	
 	\ Terminate tasks
 	: term_task \ n --
@@ -406,28 +408,28 @@ gen_server_test @ #if
 	;
 
 	: term_tasks
-		' term_task 1 1 loop
+		' term_task 1 100 loop
 	;
 	
 	\ Send messages and expect response
 	: send_message	\ n --
 		dup t:name@ "Task %s sending to %d" s:strfmt log 
-		"Task-" swap >s s:+ ' w a:new 1 a:push ' w1 +sender msg!
+		"Task-" swap >s s:+ ' somenamespace:w a:new 3 a:push ' w1 +sender msg!
 		response@
 	;
 		
 	: send_messages	\ n --
-		' send_message 1 1 loop drop
+		' send_message 1 100 loop drop
 		\ .stats
 	;
 	
 	: repeat_messages	\ --
-		' send_messages 1 1 loop
+		' send_messages 1 10 loop
 	;
 	
 	\ Main test
-	create_tasks .s
-	repeat_messages .s
+	somenamespace:create_tasks
+	repeat_messages
 	term_tasks
 	wait_all
 	"Test complete" log
