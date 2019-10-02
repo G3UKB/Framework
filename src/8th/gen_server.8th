@@ -372,10 +372,12 @@ ns: user
 gen_server_test @ #if
 	with: fr.gs
 	
-	\ Must register REPL in the task repos to be able to reply
-	t:curtask t:name@ reg!
-	\ Set q to null on empty
-	t:getq false q:throwing \ drop - why do I need to leave the q on stack else crashes immediately on running test
+	: set_q
+		\ Must register REPL in the task repos to be able to reply
+		t:curtask t:name@ reg!
+		\ Set q to null on empty
+		t:getq false q:throwing \ drop - why do I need to leave the q on stack else crashes immediately on running test
+	;
 
 	
 	\ Response calls back here
@@ -428,6 +430,7 @@ gen_server_test @ #if
 	;
 	
 	\ Main test
+	set_q
 	somenamespace:create_tasks
 	repeat_messages
 	term_tasks
