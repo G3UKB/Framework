@@ -426,7 +426,7 @@ gen_server_test @ #if
 	;
 	
 	: repeat_messages	\ --
-		' send_messages 1 10 loop
+		' send_messages 1 1000 loop
 	;
 	
 	\ Main test
