@@ -1,0 +1,111 @@
+(*
+	persist.8th
+ 
+  Models save/restore for the SDRLibEConsole application
+ 
+ Copyright C 2018 by G3UKB Bob Cowdery
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ at your option any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ 
+  The author can be reached by email at:   
+     bob@bobcowdery.plus.com
+     
+  Save and restore 8th structures representing the various models.
+	Persisted format is Json strings.
+	
+*)
+
+\ ============================================================================
+
+\ ========================================
+\ Testing only
+false var, persist_test
+
+persist_test @ #if
+	\ Includes
+	\ needs debug/sed
+	\ true SED-CHECK
+	\ needs debug/trace
+#then
+\ ========================================
+
+\ Set namespace
+ns: sdr
+
+\ ===============================================================================
+\ PUBLIC
+\ Public procedural interface
+\ ===============================================================================
+
+\ ----------------------------------
+\ Save model data as a Json string
+: save_model_data	SED: * s -- *
+	\ in: 	0: s - model path
+	\				1: * - model data
+	\ out:	0: s - model data
+	dup f:open 2 pick >json f:write drop f:close drop
+;
+
+\ ----------------------------------
+\ Restore model data and convert to 8th data
+: restore_model_data	SED: * s -- *
+	\ in: 	0: s - model path
+	\				1: s - default data
+	\ out:	0: * - model data | throw
+	
+	dup f:exists? if
+		\ We have an existing model file
+		f:size 0 n:> if
+			\ - which has at least some data in it
+			nip f:slurp dup json> null? not if
+				nip ;;
+			then
+		then
+	else
+		\ Try and create the file
+		dup f:create f:close 
+	then
+	\ No file or bad json data
+	\ Save the default model and return it as the current model
+	save_model_data
+;
+
+\ ========================================
+\ Restore namespace	
+ns: user
+
+\ ===============================================================================
+\ ===============================================================================
+\ Testing
+\ ===============================================================================
+persist_test @ #if
+	with: sdr
+	
+	: run_test
+		cr cr "Run test: " swap >s s:+ log	
+		"radio-model.cfg" f:rm
+		[1,2,3,4,5] "radio-model.cfg" restore_model_data dup . cr		
+		[5,4,3,2,1] "radio-model.cfg" save_model_data . cr		
+		[1,2,3,4,5] "radio-model.cfg" restore_model_data dup . cr
+	;
+
+	: run_tests
+		' run_test 0 100 loop
+	;
+	
+	run_tests
+	
+	bye
+#then	
+
