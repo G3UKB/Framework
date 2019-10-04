@@ -43,7 +43,7 @@
 
 \ ========================================
 \ Testing only
-true var, struct_manip_test
+false var, struct_manip_test
 
 struct_manip_test @ #if
 	\ Includes
