@@ -49,6 +49,7 @@ struct_manip_test @ #if
 	\ Includes
 	\ needs debug/sed
 	\ true SED-CHECK
+	\ dbg:line-info
 #then
 
 \ ========================================
