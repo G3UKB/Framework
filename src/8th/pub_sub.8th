@@ -49,7 +49,7 @@
 
 \ ========================================
 \ Testing only
-true var, pub_sub_test
+false var, pub_sub_test
 
 \ ----------------------------------
 pub_sub_test @ #if
