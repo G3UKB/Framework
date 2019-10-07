@@ -47,9 +47,11 @@
   	
 *)
 
+needs stack/3drop
+
 \ ========================================
 \ Testing only
-false var, pub_sub_test
+true var, pub_sub_test
 
 \ ----------------------------------
 pub_sub_test @ #if
@@ -96,13 +98,25 @@ with: fr.gs
 \ ========================================
 \ Dispatcher
 \ Dispatch to a subscriber
-\ Note: pub/sub is a one way street, no responses allowed.
-: __dispatcher	SED: * a --
+: __dispatcher	SED: * a -- *
 	\ in:		a - [task-name, w] 	
 	\				* - opaque data to send
 	\ out:	none
 	a:open 	\ * task-name w
-	rot msg!
+	\ Do not dispatch if the publisher is also the subscriber
+	1 pick dup t:name@ s:= not if
+	 \ Test for dispatch type
+	 {"REPL":1 , "GUI":1} swap m:exists? nip if
+			\ Can't message to a Q, so dispatch via g:do
+			m:new "cb" rot m:! 2 pick "data" swap m:! g:do drop
+		else
+			\ A task, so dispatch via normal messaging
+			rot msg!
+		then
+	else
+		\ Just clean up
+		3drop
+	then
 ;
 	
 \ ===============================================================================
@@ -162,13 +176,13 @@ ns: user
 pub_sub_test @ #if
 	(*
 		For a minimal test:
-		1. Have 2 words that receive published messages and print the data.
-		2. Have 2 words that subscribe to a topic.
-		3. Have 2 words that publish to a topic.
-		4. Create 2 gen-servers.
+		1. Have words that receive published messages and print the data.
+		2. Have words that subscribe to a topic.
+		3. Have words that publish to a topic.
+		4. Create n gen-servers.
 		5. Send a message via each gen-server to words in 2.
 		6. Send a message via each gen-server to words in 3.
-		7. The words in 1 should receive the messages.
+		7. The words in 1 should receive the messages inless publisher == subscriber.
 	*)
 	
 	with: fr.gs
@@ -207,6 +221,14 @@ pub_sub_test @ #if
 	: subscriber4 SED: * --
 		drop t:name@ ' receiver4 "Topic-4" subscribe
 	;
+	\ Both to same topic
+	: subscriber1.1 SED: * --
+		drop t:name@ ' receiver1 "Topic-1" subscribe
+	;
+
+	: subscriber1.2 SED: * --
+		drop t:name@ ' receiver2 "Topic-1" subscribe
+	;
 	
 	\ Publishers
 	: publisher1 SED: * --
@@ -225,30 +247,73 @@ pub_sub_test @ #if
 		drop "Data-4" "Topic-4" publish
 	;	
 	
-	\ Create tasks
-	"Task-1" gen_server_new
-	"Task-2" gen_server_new
-	"Task-3" gen_server_new
-	"Task-4" gen_server_new
-	\ Subscribe
-	"Task-1" ' subscriber1 null msg!
-	"Task-2" ' subscriber2 null msg!
-	"Task-3" ' subscriber3 null msg!
-	"Task-4" ' subscriber4 null msg!
-	1 sleep
-	\ Publish
-	"Task-1" ' publisher1 null msg!
-	"Task-2" ' publisher2 null msg!
-	"Task-3" ' publisher3 null msg!
-	"Task-4" ' publisher4 null msg!
-	1 sleep
-	"Task-1" gen_server_term
-	"Task-2" gen_server_term
-	"Task-3" gen_server_term
-	"Task-4" gen_server_term
+	\ This subscriber will be on the main thread
+	: reg_task
+		\ Must register REPL in the task repos to be able to reply
+		t:curtask t:name@ reg!
+		\ Set q to null on empty
+		t:getq false q:throwing \ do not drop q else crashes
+	;
 	
-	wait_all
-	"Test complete" log
+	: main_thrd_receiver	SED: * --
+		"Called main_thrd_receiver with %s" s:strfmt log
+	;
+	
+	: main_thrd_subscriber SED:  --
+		t:name@ ' main_thrd_receiver "Topic-1" subscribe
+	;
+	
+	: runtest
+		\ Create tasks
+		"Task-1" gen_server_new
+		"Task-2" gen_server_new
+		"Task-3" gen_server_new
+		"Task-4" gen_server_new
+		"Task-5" gen_server_new
+		"Task-6" gen_server_new
+		"Task-7" gen_server_new
+		"Task-8" gen_server_new
+		\ Subscribe
+		\ Register main  task
+		reg_task
+		\ and subscribe from main thread
+		main_thrd_subscriber
+		\ Task subscriptions
+		"Task-1" ' subscriber1 null msg!
+		"Task-2" ' subscriber2 null msg!
+		"Task-3" ' subscriber3 null msg!
+		"Task-4" ' subscriber4 null msg!
+		1 sleep
+		\ Publish
+		\ These will not call subscribers as publisher == subscriber
+		\ Except Task-1 which will publish to REPL via g:do as well as Task-1
+		"Task-1" ' publisher1 null msg!
+		"Task-2" ' publisher2 null msg!
+		"Task-3" ' publisher3 null msg!
+		"Task-4" ' publisher4 null msg!
+		\ These will call subscribers
+		"Task-5" ' publisher1 null msg!
+		"Task-6" ' publisher2 null msg!
+		"Task-7" ' publisher3 null msg!
+		"Task-8" ' publisher4 null msg!
+		1 sleep
+		\ Close servers
+		"Task-1" gen_server_term
+		"Task-2" gen_server_term
+		"Task-3" gen_server_term
+		"Task-4" gen_server_term
+		"Task-5" gen_server_term
+		"Task-6" gen_server_term
+		"Task-7" gen_server_term
+		"Task-8" gen_server_term
+		1 sleep
+		\ Wait for completion
+		wait_all  
+		"Test complete" log
+		1 sleep
+	;
+	
+	runtest
 	bye
 	
 #then

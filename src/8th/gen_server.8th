@@ -282,7 +282,7 @@ ns: fr.gs
 	__gs_lock@
 	' __gs_wait_task m:each
 	1 sleep
-	__gs_unlock drop 2drop ;
+	__gs_unlock 2drop ;
 
 \ ========================================
 \ Message management
@@ -426,7 +426,7 @@ gen_server_test @ #if
 	;
 	
 	: repeat_messages	\ --
-		' send_messages 1 100 loop
+		' send_messages 1 10 loop
 	;
 	
 	\ Main test
