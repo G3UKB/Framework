@@ -51,7 +51,7 @@ needs stack/3drop
 
 \ ========================================
 \ Testing only
-true var, pub_sub_test
+false var, pub_sub_test
 
 \ ----------------------------------
 pub_sub_test @ #if
@@ -155,8 +155,8 @@ with: fr.gs
 	\ out:	none	
 	__ps_lock@ 
 	1 pick m:exists? not if
-		\ No such topic
-		1 pick "Topic %s does not exist - ignoring" s:strfmt log 2drop
+		\ No subscribers, may not be an error but report just incase
+		1 pick "No subscribers for topic %s" s:strfmt log 2drop
 	else
 		1 pick m:@ nip nip ' __dispatcher a:each!
 	then
