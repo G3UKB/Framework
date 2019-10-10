@@ -46,6 +46,7 @@
   		publish	SED: * s --
   	
 *)
+\ This is broken for more than one event for a topic.
 
 needs stack/3drop
 
@@ -106,12 +107,12 @@ with: fr.gs
 	\ Do not dispatch if the publisher is also the subscriber
 	1 pick dup t:name@ s:= not if
 	 \ Test for dispatch type
-	 {"REPL":1 , "GUI":1} swap m:exists? nip if
+	 {"REPL":1 , "GUI":1, "MainTask":1} swap m:exists? nip if
 			\ Can't message to a Q, so dispatch via g:do
 			m:new "cb" rot m:! 2 pick "data" swap m:! g:do drop
 		else
 			\ A task, so dispatch via normal messaging
-			rot msg!
+			2 pick msg!
 		then
 	else
 		\ Just clean up
@@ -145,6 +146,7 @@ with: fr.gs
 	then
 	__ps_unlock
 	2drop 2drop
+	\ __ps_lock@ . cr __ps_unlock
 ;
 
 \ ----------------------------------
@@ -155,15 +157,15 @@ with: fr.gs
 	\ out:	none	
 	__ps_lock@ 
 	1 pick m:exists? not if
-		\ No subscribers, may not be an error but report just incase
-		1 pick "No subscribers for topic %s" s:strfmt log 2drop
+		\ At this point it is an error
+		1 pick "No subscribers for topic %s!" s:strfmt log 2drop
 	else
 		1 pick m:@ nip nip ' __dispatcher a:each!
 	then
 	__ps_unlock
 	drop
-;	
-	
+;
+
 \ ========================================
 \ Reset namespace
 ns: user
@@ -182,11 +184,13 @@ pub_sub_test @ #if
 		4. Create n gen-servers.
 		5. Send a message via each gen-server to words in 2.
 		6. Send a message via each gen-server to words in 3.
-		7. The words in 1 should receive the messages inless publisher == subscriber.
+		7. The words in 1 should receive the messages unless publisher == subscriber.
 	*)
 	
 	with: fr.gs
 	with: fr.ps
+	
+	4 json-pretty
 	
 	\ Receivers
 	: receiver1	SED: * --
@@ -280,6 +284,7 @@ pub_sub_test @ #if
 		main_thrd_subscriber
 		\ Task subscriptions
 		"Task-1" ' subscriber1 null msg!
+		"Task-1" ' subscriber1.2 null msg!
 		"Task-2" ' subscriber2 null msg!
 		"Task-3" ' subscriber3 null msg!
 		"Task-4" ' subscriber4 null msg!
