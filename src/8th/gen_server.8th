@@ -242,7 +242,7 @@ ns: fr.gs
 		depth 4 n:> if
 			"Task " t:name@ s:+ " warning - data stack growing [" s:+ depth 2 n:- >s s:+ "]!" s:+ log
 		then
-		\ Check for stack underflow problem, we should always have two items of the stack.
+		\ Check for stack underflow problem, we should always have two items on the stack.
 		depth 2 n:< if
 			"Task " t:name@ s:+ " fatal - data stack would cause underflow [" s:+ depth 2 n:- >s s:+ "]!" s:+ throw
 		then
