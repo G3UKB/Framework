@@ -222,8 +222,12 @@ ns: fr.gs
 	\ Set q to return null on empty
 	\ Note, should not happen
 	t:getq false q:throwing drop
-	\ Wake up main thread which is waiting for us to finish initialisation
+	\ Wake up calling thread which is waiting for us to finish initialisation
 	r> t:notify
+	\ We put 2 arbitrary items on stack. This allow us to check if the stack
+	\ would cause an underflow which nearly always causes a crash and is therefore
+	\ very hard to find.
+	-1 -1
 	\ Loop while run enabled
 	repeat
 		\ Wait for a wake up notify
@@ -234,9 +238,13 @@ ns: fr.gs
 		times
 		\ Check for exit
 		t:name@ "_run" s:+ t:@
-		\ Check for stack problem, only the T value should be on stack at this point.
-		depth 2 n:> if
+		\ Check for stack growth problem, only the T value and underflow items should be on stack at this point.
+		depth 4 n:> if
 			"Task " t:name@ s:+ " warning - data stack growing [" s:+ depth 2 n:- >s s:+ "]!" s:+ log
+		then
+		\ Check for stack underflow problem, we should always have two items of the stack.
+		depth 2 n:< if
+			"Task " t:name@ s:+ " fatal - data stack would cause underflow [" s:+ depth 2 n:- >s s:+ "]!" s:+ throw
 		then
 	while!
 	\ Exit message
