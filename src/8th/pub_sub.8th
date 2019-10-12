@@ -158,7 +158,7 @@ with: fr.gs
 	__ps_lock@ 
 	1 pick m:exists? not if
 		\ At this point it is an error
-		1 pick "No subscribers for topic %s!" s:strfmt log 2drop
+		1 pick "No subscribers for topic %s!" s:strfmt log drop
 	else
 		1 pick m:@ nip nip ' __dispatcher a:each!
 	then

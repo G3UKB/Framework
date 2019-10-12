@@ -212,6 +212,7 @@ ns: fr.gs
 	\ out:	none
 	\ Assign name and store in registry
 	>r dup t:name! t:curtask swap __gs_reg!
+	t:curtask log
 	
 	\ Set a task exception handler
 	' __handler t:handler
@@ -227,7 +228,9 @@ ns: fr.gs
 	\ We put 2 arbitrary items on stack. This allow us to check if the stack
 	\ would cause an underflow which nearly always causes a crash and is therefore
 	\ very hard to find.
-	-1 -1
+	-1 -1 
+	\ Set initial depth limit to 3 (T + underflow items)
+	3 "depth" t:!
 	\ Loop while run enabled
 	repeat
 		\ Wait for a wake up notify
@@ -239,8 +242,9 @@ ns: fr.gs
 		\ Check for exit
 		t:name@ "_run" s:+ t:@
 		\ Check for stack growth problem, only the T value and underflow items should be on stack at this point.
-		depth 4 n:> if
+		depth "depth" t:@ n:> if
 			"Task " t:name@ s:+ " warning - data stack growing [" s:+ depth 2 n:- >s s:+ "]!" s:+ log
+			depth "depth" t:!
 		then
 		\ Check for stack underflow problem, we should always have two items on the stack.
 		depth 2 n:< if
