@@ -146,7 +146,6 @@ with: fr.gs
 	then
 	__ps_unlock
 	2drop 2drop
-	\ __ps_lock@ . cr __ps_unlock
 ;
 
 \ ----------------------------------
