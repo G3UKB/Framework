@@ -271,13 +271,21 @@ ns: fr.gs
 
 \ ----------------------------------
 \ Register an external task
+: reg@	SED: s -- t
+	__gs_reg@ 
+;
+	
+\ ----------------------------------
+\ Register an external task
 : reg!	SED: t s --
-	__gs_reg! ;
+	__gs_reg! 
+;
 
 \ ----------------------------------
 \ Remove an external task
 : reg_rm	SED: s -- t
-	__gs_reg_rm ;
+	__gs_reg_rm 
+;
 
 \ ----------------------------------
 \ Wait for task to terminate
@@ -286,7 +294,8 @@ ns: fr.gs
 	__gs_lock@
 	r@ m:@ t:wait
 	r> m:-
-	__gs_unlock drop ;
+	__gs_unlock drop 
+;
 
 \ ----------------------------------
 \ Wait for all tasks to terminate
@@ -294,7 +303,8 @@ ns: fr.gs
 	__gs_lock@
 	' __gs_wait_task m:each
 	1 sleep
-	__gs_unlock 2drop ;
+	__gs_unlock 2drop 
+;
 
 \ ========================================
 \ Message management
