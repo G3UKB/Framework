@@ -51,15 +51,32 @@
   
   When the word w receives a message from msg! it must be aware of the structure of the opaque data and if a response
   is required the array must include the sender name and word to call. In order to respond it should call response! 
-  with the sender name s, w the word to call with the response data and * the opaque response data.
+  with the sender name s, w|null the word to call with the response data and * the opaque response data.
   
   	response!	SED: s w * --
-  	
-  The response is not automatically sent to word w from response!. It exists in the task-q of the message sender and 
-  must be retrieved with response@ by the sender. This should be done by the word that performed the msg! as its next action.
-  The word w in the response! call will then be called with the data. In this way separate words can be assigned to handle each 
-  response action.
   
+  There are several possible scenarios with responses [and messages in some cases].
+  1. If both sender and receiver are gen-server tasks then messages are sent to the designated word in the receiving task. If
+  	the response word is not null then responses are sent to the designated response word via another msg!. A call to 
+  	response@ is NOT required as the gen-server will have already retrieved and dispatched the message.
+  2. The receiver is a gen-server [required] but the sender is not. In this case the sender must be registered with the task repos
+  	such that it can be found when responding. Again messages are sent to the designated word in the receiving task. If
+  	the response word is not null then responses are sent to the designated response word via another msg!. There ae two possible paths:
+  		1. The sender is a normal task created manually with t:task. In this case the response will arrive in the task q but as this
+  			is not a gen-server there is no automatic retrieval of the response so the sender MUST call response@ to retrieve the
+  			response message which is then dispatched to the designated response word.
+  		2. The sender is the main task, this could be nominated REPL, GUI, MAIN-TASK [all treated the same]. These cannot be gen-server
+  			tasks as they are 8th tasks not user tasks. The gen-server module does NOT discriminate these tasks and will post to a word
+  			via msg! should one be given as a response destination. This will work if the application is NOT a GUI app. It can retrieve
+  			messages posted to its q using response@. If this is a GUI task then the application may freeze. DO NOT request a response
+  			when used in this manor except for module test code, only send messages with a null response word.
+  3. When communication is via the pub/sub system the exact same rules apply as this uses the gen-server messaging system. However
+  	there is a slight twist. When a message is published, any subscribers that have the main task as their sender and also specify
+  	a response word, then the response is dispatched via g:do rather than msg!. Similarly if a main task subscribes to a topic then
+  	messages published to that topic for that subscriber will also be dispatched via g:do. The upshot is that when communicating
+  	between a GUI task and a gen-server task when messages/responses are to be received by the GUI task ONLY use the pub/sub 
+  	system and not direct sends through msg!.
+  	
   	response@	SED: -- 
   
   Additional words for task registration and other utility actions:
