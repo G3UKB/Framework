@@ -342,8 +342,8 @@ ns: fr.gs
 	swap __gs_lock@ 
 	swap m:@ nip
 	\ Push message to task q
-	dup rot t:push 
-	t:q-notify 
+	dup rot t:push
+	t:q-notify
 	\ Release lock
 	__gs_unlock drop
 ;
