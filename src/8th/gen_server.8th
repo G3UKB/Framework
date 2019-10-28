@@ -356,12 +356,37 @@ ns: fr.gs
 	\ out: 	0: a - [*, sender task name, w]
 	swap t:name@ a:push swap a:push
 ;
-	
+
+\ ----------------------------------
+\ Pull and execute from a task q else do nothing
+\ Useful for non gen-server tasks which use pub/sub
+: msg@
+	\ Check for a message
+	t:qlen 0 n:> if 
+		t:pop null? not if
+			\ We have work
+			\ Just send the data part of the message
+			"data" m:@ 0 a:@ nip swap "cb" m:@ nip w:exec
+		then
+	then
+;
+\ As msg@ but return whole message
+: msg@@
+	\ Check for a message
+	t:qlen 0 n:> if 
+		t:pop null? not if
+			\ We have work
+			\ Send the whole message which has the sender/word for responses
+			"data" m:@ swap "cb" m:@ nip w:exec
+		then
+	then
+;
+
 \ ========================================
 \ Response management
 
 \ ----------------------------------
-\ Get task response for synchronous sends
+\ Get task response for synchronous send/response
 : response@	SED: -- 
 	\ in: 	none
 	\ out: 	0: * - opaque response data
@@ -376,6 +401,31 @@ ns: fr.gs
 		then
 	while drop	
 	"Timeout waiting for task response!" log
+;
+
+\ ----------------------------------
+\ Pull and execute from a task q else do nothing
+\ Useful for non gen-server tasks which use pub/sub
+: response@@
+	\ Check for a message
+	t:qlen 0 n:> if 
+		t:pop null? not if
+			\ We have work
+			\ Just send the data part of the message
+			"data" m:@ 0 a:@ nip swap "cb" m:@ nip w:exec
+		then
+	then
+;
+\ As response@@ but whole message
+: response@@@
+	\ Check for a message
+	t:qlen 0 n:> if 
+		t:pop null? not if
+			\ We have work
+			\ Send the whole message which has the sender/word for responses
+			"data" m:@ swap "cb" m:@ nip w:exec
+		then
+	then
 ;
 
 \ ----------------------------------
