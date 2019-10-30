@@ -128,7 +128,7 @@
 
 \ ========================================
 \ Testing only
-false var, gen_server_test
+true var, gen_server_test
 
 \ ----------------------------------
 gen_server_test @ #if
@@ -252,7 +252,7 @@ ns: fr.gs
 	
 \ ----------------------------------
 \ Task entry point for all generic servers
-: __gen_server	 SED: s t --
+: __gen_server	 SED: s t -- 
 	\ in: 	0 t: calling task
 	\				1 s: this task name
 	\ out:	none
@@ -274,7 +274,7 @@ ns: fr.gs
 	\ We put 2 arbitrary items on stack. This allow us to check if the stack
 	\ would cause an underflow which nearly always causes a crash and is therefore
 	\ very hard to find.
-	-1 -1 
+	-1 -1
 	\ Set initial depth limit to 3 (T + underflow items)
 	3 "depth" t:!
 	\ Loop while run enabled
@@ -298,7 +298,8 @@ ns: fr.gs
 		then
 	while!
 	\ Exit message
-	t:name@ " - exiting... [" s:+ depth >s s:+ "]" s:+ log ;
+	t:name@ " - exiting... [" s:+ depth >s s:+ "]" s:+ log 2drop
+;
 
 \ ===============================================================================
 \ ===============================================================================
@@ -493,7 +494,7 @@ gen_server_test @ #if
 	;
 	
 	: create_tasks
-		' create_task 1 100 loop drop
+		' create_task 1 1 loop drop
 	;
 	ns: user
 	
@@ -503,7 +504,7 @@ gen_server_test @ #if
 	;
 
 	: term_tasks
-		' term_task 1 100 loop
+		' term_task 1 1 loop
 	;
 	
 	\ Send messages and expect response
@@ -514,12 +515,12 @@ gen_server_test @ #if
 	;
 		
 	: send_messages	\ n --
-		' send_message 1 100 loop drop
+		' send_message 1 1 loop drop
 		\ .stats
 	;
 	
 	: repeat_messages	\ --
-		' send_messages 1 10 loop
+		' send_messages 1 1 loop
 	;
 	
 	\ Main test

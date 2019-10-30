@@ -46,7 +46,6 @@
   		publish	SED: * s --
   	
 *)
-\ This is broken for more than one event for a topic.
 
 needs stack/3drop
 
