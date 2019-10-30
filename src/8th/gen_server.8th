@@ -46,6 +46,12 @@
   
   	msg! SED: s w * --
   
+  Retrieve message for tasks that are not gen-servers. Returns only data content.
+  	msg@ SED: -- *
+  	
+  Retrieve message for tasks that are not gen-servers. Returns the whole message which includes response info.
+  	msg@@ SED: -- *
+  	
   A helper which will add the senders task name and word to call to the end of the array a, returning the new array.
   	+sender SED: a w -- a
   
@@ -55,27 +61,7 @@
   
   	response!	SED: s w * --
   
-  There are several possible scenarios with responses [and messages in some cases].
-  1. If both sender and receiver are gen-server tasks then messages are sent to the designated word in the receiving task. If
-  	the response word is not null then responses are sent to the designated response word via another msg!. A call to 
-  	response@ is NOT required as the gen-server will have already retrieved and dispatched the message.
-  2. The receiver is a gen-server [required] but the sender is not. In this case the sender must be registered with the task repos
-  	such that it can be found when responding. Again messages are sent to the designated word in the receiving task. If
-  	the response word is not null then responses are sent to the designated response word via another msg!. There ae two possible paths:
-  		1. The sender is a normal task created manually with t:task. In this case the response will arrive in the task q but as this
-  			is not a gen-server there is no automatic retrieval of the response so the sender MUST call response@ to retrieve the
-  			response message which is then dispatched to the designated response word.
-  		2. The sender is the main task, this could be nominated REPL, GUI, MAIN-TASK [all treated the same]. These cannot be gen-server
-  			tasks as they are 8th tasks not user tasks. The gen-server module does NOT discriminate these tasks and will post to a word
-  			via msg! should one be given as a response destination. This will work if the application is NOT a GUI app. It can retrieve
-  			messages posted to its q using response@. If this is a GUI task then the application may freeze. DO NOT request a response
-  			when used in this manor except for module test code, only send messages with a null response word.
-  3. When communication is via the pub/sub system the exact same rules apply as this uses the gen-server messaging system. However
-  	there is a slight twist. When a message is published, any subscribers that have the main task as their sender and also specify
-  	a response word, then the response is dispatched via g:do rather than msg!. Similarly if a main task subscribes to a topic then
-  	messages published to that topic for that subscriber will also be dispatched via g:do. The upshot is that when communicating
-  	between a GUI task and a gen-server task when messages/responses are to be received by the GUI task ONLY use the pub/sub 
-  	system and not direct sends through msg!.
+  Retrieve a response to a message for non-gen-server tasks.
   	
   	response@	SED: -- 
   
@@ -94,7 +80,50 @@
   
   wait_single_task SED: s --
   Wait_all SED: --
-  
+ 
+ Messaging scenarios
+ ===================
+ There are quite a number of sender/receiver combinations that require specific protocols. These are pretty much the same
+ whether messaging is direct through the gen-server or through the pub/sub system which dispatches through gen-server.
+ However, the pub-sub system should be used for all communication unless there is a reason for not doing so. 
+ 
+ 1. Sender : gen-server, receiver : gen-server. 
+ 		This is the simplest scenario as everything is managed by the gen-server. Messages are sent using msg!. If a response
+ 		task and word is included in the message then the response is automatically sent to the task. Note that both sending and
+ 		receiving are dispatched via the task-q so always arrive on the thread of the appropriate task. This is also true if 
+ 		messages are sent via pub/sub. This provides complete isolation between tasks.
+ 2. Sender : gen-server, receiver : normal user task.
+ 		In this case the normal user task must be registered using reg! so its task object can be retrieved by task name. Sending is 
+ 		the same as before using msg!. However, the receiver is not going to get that message automatically because there is no
+ 		gen-server to take it from the q. Therefore the receiver maust call msg@ or msg@@ to retrieve messages. It must do this
+ 		on a regular basis. There is no return value from the call, either the receiver word is called if there is a message or
+ 		nothing happens. If a response is required then the receiver can simply use msg! and the sender will automatically get the response.
+ 3. Sender : normal user task, receiver gen-server.
+ 		This is similar to [2]. The sender uses msg! and the receiver automatically gets the message. If a response is required then sender
+ 		must use response@ as it will not automatically get the response. If it wants responses it must be registered.
+ 4.	Sender : gen-server, receiver : GUI task.
+ 		A GUI taks cannot read from its task q and any attempt to do so will cause a freeze. For this reason all communication with a
+ 		GUI task MUST use the pub/sub system. Gen-server does not distinguish between tasks. The pub/sub system takes a different path for
+ 		the main task [GUI, REPL and MAIN_TASK are considered the same]. For these it dispatches using g:do rather than through gen-server.
+ 		The g:do call automatically calls the word under the "cb" key so no action required nby the GUI task.
+ 5. Sender : GUI task, receiver : gen-server.
+ 		Again pub/sub should be used although direct calls will work. The sender publishes and the receiver [all subscribers] automatically 
+ 		receive the message.
+ 		
+ A further word on pub/sub
+ ==========================
+ This is actually a very simple module. A subscriber subscribes to a topic and gives a task name and a word
+ to call. If the topic is not present a new entry is started else the subscriber is added to the topic. When a message is published
+ it is sent to all subscribers either using msg! or g:do as explained above. This means that a receiver does not know if the message
+ was sent directly of via a publish, so it can contain the same reply information. If a reply word is set then the receiver can
+ simply reply directly via msg!. This can be useful is some cases but beware of sending a reply to a GUI task! If a publisher has
+ provided a reply word then if the sender was a gen-server it will be dispatched as normal but if it was a normal task then response@
+ must be called to retrieve the response. HOWEVER, pub/sub in general should be used for send and forget traffic and if some response 
+ is required then its better to have a separate pub/sub channel to respond on.
+ 
+ Note that response@ is used quite a lot in the non-GUI module tests as in this case when the test is conducted from the main thread
+ it can receive messages on its q. This is both for direct messaging and pub/sub messaging.
+
 *)
 
 \ ========================================
@@ -360,7 +389,7 @@ ns: fr.gs
 \ ----------------------------------
 \ Pull and execute from a task q else do nothing
 \ Useful for non gen-server tasks which use pub/sub
-: msg@
+: msg@	SED: -- *
 	\ Check for a message
 	t:qlen 0 n:> if 
 		t:pop null? not if
@@ -371,7 +400,7 @@ ns: fr.gs
 	then
 ;
 \ As msg@ but return whole message
-: msg@@
+: msg@@	SED: -- *
 	\ Check for a message
 	t:qlen 0 n:> if 
 		t:pop null? not if
@@ -401,31 +430,6 @@ ns: fr.gs
 		then
 	while drop	
 	"Timeout waiting for task response!" log
-;
-
-\ ----------------------------------
-\ Pull and execute from a task q else do nothing
-\ Useful for non gen-server tasks which use pub/sub
-: response@@
-	\ Check for a message
-	t:qlen 0 n:> if 
-		t:pop null? not if
-			\ We have work
-			\ Just send the data part of the message
-			"data" m:@ 0 a:@ nip swap "cb" m:@ nip w:exec
-		then
-	then
-;
-\ As response@@ but whole message
-: response@@@
-	\ Check for a message
-	t:qlen 0 n:> if 
-		t:pop null? not if
-			\ We have work
-			\ Send the whole message which has the sender/word for responses
-			"data" m:@ swap "cb" m:@ nip w:exec
-		then
-	then
 ;
 
 \ ----------------------------------
