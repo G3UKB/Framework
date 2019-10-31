@@ -89,9 +89,9 @@
  
  1. Sender : gen-server, receiver : gen-server. 
  		This is the simplest scenario as everything is managed by the gen-server. Messages are sent using msg!. If a response
- 		task and word is included in the message then the response is automatically sent to the task. Note that both sending and
- 		receiving are dispatched via the task-q so always arrive on the thread of the appropriate task. This is also true if 
- 		messages are sent via pub/sub. This provides complete isolation between tasks.
+ 		task and word is included in the message then the response is automatically sent to the task using response!. Do not use msg!
+ 		to send a response as it will not work because the work needs to exit before msg! can be used.Note that both sending and
+ 		receiving are dispatched via the task-q so always arrive on the thread of the receiving task, not of the sending task.
  2. Sender : gen-server, receiver : normal user task.
  		In this case the normal user task must be registered using reg! so its task object can be retrieved by task name. Sending is 
  		the same as before using msg!. However, the receiver is not going to get that message automatically because there is no
@@ -99,31 +99,16 @@
  		on a regular basis. There is no return value from the call, either the receiver word is called if there is a message or
  		nothing happens. If a response is required then the receiver can simply use msg! and the sender will automatically get the response.
  3. Sender : normal user task, receiver gen-server.
- 		This is similar to [2]. The sender uses msg! and the receiver automatically gets the message. If a response is required then sender
- 		must use response@ as it will not automatically get the response. If it wants responses it must be registered.
+ 		This is similar to [2]. The sender uses msg! As in [2] the receiver does not automatically get the message, it must use msg@ or 
+ 		msg@@. If a response is required then sender must call response@ as it will not automatically get the response. The usual place
+ 		top do that is immediately after msg!. Pre-requirements if it wants a response it must be registered and the user task must set
+ 		its task name with t:name! else +sender will get the default name and registry lookup will fail.
  4.	Sender : gen-server, receiver : GUI task.
- 		A GUI taks cannot read from its task q and any attempt to do so will cause a freeze. For this reason all communication with a
- 		GUI task MUST use the pub/sub system. Gen-server does not distinguish between tasks. The pub/sub system takes a different path for
- 		the main task [GUI, REPL and MAIN_TASK are considered the same]. For these it dispatches using g:do rather than through gen-server.
- 		The g:do call automatically calls the word under the "cb" key so no action required nby the GUI task.
+ 		This is similar to [2] above with the exception that the message is dispatched using g:do rather than to the message q. The message
+ 		q and all synchronisation methods are inoperable in a GUI task. If the receiver wants to get a reply it can be sent by response!.
  5. Sender : GUI task, receiver : gen-server.
- 		Again pub/sub should be used although direct calls will work. The sender publishes and the receiver [all subscribers] automatically 
- 		receive the message.
- 		
- A further word on pub/sub
- ==========================
- This is actually a very simple module. A subscriber subscribes to a topic and gives a task name and a word
- to call. If the topic is not present a new entry is started else the subscriber is added to the topic. When a message is published
- it is sent to all subscribers either using msg! or g:do as explained above. This means that a receiver does not know if the message
- was sent directly of via a publish, so it can contain the same reply information. If a reply word is set then the receiver can
- simply reply directly via msg!. This can be useful is some cases but beware of sending a reply to a GUI task! If a publisher has
- provided a reply word then if the sender was a gen-server it will be dispatched as normal but if it was a normal task then response@
- must be called to retrieve the response. HOWEVER, pub/sub in general should be used for send and forget traffic and if some response 
- is required then its better to have a separate pub/sub channel to respond on.
- 
- Note that response@ is used quite a lot in the non-GUI module tests as in this case when the test is conducted from the main thread
- it can receive messages on its q. This is both for direct messaging and pub/sub messaging.
-
+ 		Again similar to [3] above. The GUI task uses msg! to send and if it wants to receive a reply can use response@ which sends through msg!
+ 		which will dispatch via g:do.
 *)
 
 \ ========================================
@@ -258,7 +243,7 @@ ns: fr.gs
 	\ out:	none
 	\ Assign name and store in registry
 	>r dup t:name! t:curtask swap __gs_reg!
-	t:curtask log
+	"Created gen-server: " t:name@ s:+ log
 	
 	\ Set a task exception handler
 	' __handler t:handler
@@ -355,6 +340,10 @@ ns: fr.gs
 
 \ ========================================
 \ Message management
+\ task-name task-name-to-check
+: cmp_task	SED: s s -- T
+	over s:= if true else false then
+;
 
 \ ----------------------------------
 \ Message send to a given word on a given task name queue
@@ -365,15 +354,23 @@ ns: fr.gs
 	\ out:	none
 	\ Word to invoke under the "cb" key and data under the "data" key
 	\ The data is cloned before the send as it must be detached from the current task pool
+	2 pick >r
 	m:new "cb" 3 pick m:! "data" 2 pick m:! nip nip
 	\ Clone the whole message structure and push to the task q
 	const
 	\ Get task for name and lock task-dict
 	swap __gs_lock@ 
 	swap m:@ nip
-	\ Push message to task q
-	dup rot t:push
-	t:q-notify
+	\ Check message destination
+	dup rot  \ task data
+	r> ["REPL" , "GUI", "MainTask"] ' cmp_task a:filter nip a:len nip 0 n:> if 
+		\ The destination is a main-task so we must use g:do
+		\ task data {"cb": w, "data":[value, sender]}
+		g:do
+	else
+		\ User task or gen-server so push message to task q 
+		t:push t:q-notify
+	then
 	\ Release lock
 	__gs_unlock drop
 ;
@@ -445,6 +442,19 @@ ns: fr.gs
 	const 3 ' __responder t:task-n t:wait
 ;
 
+\ ----------------------------------
+\ Chck for response data
+\ respnse-array -- task-name word flag
+: __is_response? SED: a -- s w T
+	a:len 3 n:= if
+		a:open null? if
+			false
+		else
+			true
+		then
+	then
+;
+
 \ ========================================
 \ Task termination
 \ ----------------------------------
@@ -466,70 +476,189 @@ ns: user
 gen_server_test @ #if
 	with: fr.gs
 	
-	: set_q
-		\ Must register REPL in the task repos to be able to reply
-		t:curtask t:name@ reg!
-		\ Set q to null on empty
-		t:getq false q:throwing \ drop - why do I need to leave the q on stack else crashes immediately on running test
-	;
-
+	\ The functional tests execute each scenario as given in the docs intro.
+	\ Words called by messaging system
 	
-	\ Response calls back here
-	: w1
-		a:open t:name@ "Response callback to: %s from %s with %d" s:strfmt log 
-		ns:m pool-clear ns:a pool-clear
+	\ ========================================
+	\ Scenario 1: sender: gen-server, receiver: gen-server
+	: s1_gs1_response
+		t:name@ "%s received response %s" s:strfmt log
+	;
+	: s1_gs1_receive
+		t:name@ "%s received message %s" s:strfmt log
+	;
+	: s1_gs2_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data
+		__is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from GS-2"] response!
+		then
+	;
+	: s1_repl_receive
+		\ Initial receive to kick off exchanges between GS-1 and GS-2
+		t:name@ "%s received message %s" s:strfmt log
+		\ We are now in GS-1 so we can send a message to GS-2
+		\ The message must be an array
+		"GS-2" ' s1_gs2_receive ["Hi from GS-1"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"GS-2" ' s1_gs2_receive ["Hi from GS-1"] ' s1_gs1_response +sender msg!
+	;	
+	: scenario-1
+		"*********Scenario 1 *********" log
+		\ Create two gen-servers
+		\ Note that we get nothing back, simply use the name to communicate
+		\ Also as this is not a GUI task yet we can create these on the main thread
+		"GS-1" gen_server_new
+		"GS-2" gen_server_new
+		\ Send a message from REPL to GS-1 to start things rolling
+		"GS-1" ' s1_repl_receive ["Hi from REPL"] msg!
+		1 sleep
+		"GS-1" gen_server_term
+		"GS-2" gen_server_term
+	;
+	\ ========================================
+	
+	\ ========================================
+	\ Scenario 2 sender: gen-server, receiver: user task
+	: s2_gs1_response
+		t:name@ "%s received response %s" s:strfmt log
+	;
+	: s2_gs2_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data
+		__is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from GS-2"] response!
+		then
+	;
+	: s2_task_response
+			t:name@ "%s received response %s" s:strfmt log
+	;
+	: s2_task_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for termination
+		0 a:@ "term" s:= if true "t1" t:! then 
+		\ Test for response data
+		__is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from T-1"] response!
+		then
+	;
+	: s2_task
+		"T-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		false "t1" t:!
+		repeat
+			"t1" t:@ if break then
+			msg@@
+			0.1 sleep
+		again
+		t:name@ "%s exiting" s:strfmt log
+	;
+	: s2_repl_receive
+		\ Initial receive to kick off exchanges between GS-1 and T-1
+		t:name@ "%s received message %s" s:strfmt log
+		\ We are now in GS-1 so we can send a message to T-1
+		\ The message must be an array
+		"T-1" ' s2_task_receive ["Hi from GS-1"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"T-1" ' s2_task_receive ["Hi from GS-1"] ' s2_gs1_response +sender msg!
+	;	
+	: scenario-2
+		"*********Scenario 2 *********" log
+		\ Create one gen-server and one task
+		\ Note that we get nothing back, simply use the name to communicate
+		\ Also as this is not a GUI task yet we can create this on the main thread
+		"GS-1" gen_server_new
+		\ Create user task and register it
+		' s2_task t:task "T-1" reg!
+		\ Send a message from REPL to GS-1 to start things rolling
+		"GS-1" ' s2_repl_receive ["Hi from REPL"] msg!
+		1 sleep
+		"GS-1" gen_server_term
+		"T-1" ' s2_task_receive ["term"] msg!
+	;
+	\ ========================================
+	
+	\ ========================================
+	\ Scenario 2 sender: user task, receiver: gen-server
+	: s3_gs1_response
+		t:name@ "%s received response %s" s:strfmt log
+	;
+	: s3_gs1_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data
+		__is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from GS-2"] response!
+		then
+	;
+	: s3_task_response
+			t:name@ "%s received response %s" s:strfmt log
+	;
+	: s3_task_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for termination
+		0 a:@ "term" s:= if true "t1" t:! then 
+		\ Test for response data
+		__is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from T-1"] response!
+		then
+	;
+	: s3_task
+		\ Must set task name else +sender will get the defult name and lookup will fail.
+		"T-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		\ Don't throw
+		t:getq false q:throwing drop
+		false "t1" t:!
+		repeat
+			"t1" t:@ if break then
+			msg@@
+			0.1 sleep
+		again
+		t:name@ "%s exiting" s:strfmt log
+	;
+	: s3_repl_receive
+		\ Initial receive to kick off exchanges between T-1 and GS-1
+		t:name@ "%s received message %s" s:strfmt log
+		\ We are now in T-1 so we can send a message to T-1
+		\ The message must be an array
+		"GS-1" ' s3_gs2_receive ["Hi from T-1"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"GS-1" ' s3_gs1_receive ["Hi from T-1"] ' s3_task_response +sender msg! response@
+	;	
+	: scenario-3
+		"*********Scenario 3 *********" log
+		\ Create one gen-server and one task
+		\ Note that we get nothing back, simply use the name to communicate
+		\ Also as this is not a GUI task yet we can create this on the main thread
+		"GS-1" gen_server_new
+		\ Create user task and register it
+		' s3_task t:task "T-1" reg!
+		\ Send a message from REPL to T-1 to start things rolling
+		"T-1" ' s3_repl_receive ["Hi from REPL"] msg!
+		1 sleep
+		"GS-1" gen_server_term
+		"T-1" ' s3_task_receive ["term"] msg!
+	;
+	\ ========================================
+	
+	\ ========================================
+	: app:main
+		scenario-1
+		1 sleep
+		scenario-2
+		1 sleep
+		scenario-3
+		con:key
+		bye
 	;
 	
-	ns: somenamespace
-	\ Called by REPL and response to REPL
-	: w
-		t:name@ "%s called w" s:strfmt log 
-		1 a:@ swap 2 a:@ nip a:new 3 a:push t:name@ a:push response!
-		ns:m pool-clear ns:a pool-clear
-	;
-	
-	\ Create a number of tasks
-	: create_task \ n --
-		"Task-" swap >s s:+ gen_server_new
-	;
-	
-	: create_tasks
-		' create_task 1 1 loop drop
-	;
-	ns: user
-	
-	\ Terminate tasks
-	: term_task \ n --
-		"Task-" swap >s s:+ gen_server_term
-	;
-
-	: term_tasks
-		' term_task 1 1 loop
-	;
-	
-	\ Send messages and expect response
-	: send_message	\ n --
-		dup t:name@ "Task %s sending to %d" s:strfmt log 
-		"Task-" swap >s s:+ ' somenamespace:w a:new 3 a:push ' w1 +sender msg!
-		response@
-	;
-		
-	: send_messages	\ n --
-		' send_message 1 1 loop drop
-		\ .stats
-	;
-	
-	: repeat_messages	\ --
-		' send_messages 1 1 loop
-	;
-	
-	\ Main test
-	set_q
-	somenamespace:create_tasks
-	repeat_messages
-	term_tasks
-	wait_all
-	"Test complete" log
-	bye
 #then
 	
