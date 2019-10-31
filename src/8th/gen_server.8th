@@ -584,7 +584,7 @@ gen_server_test @ #if
 	\ ========================================
 	
 	\ ========================================
-	\ Scenario 2 sender: user task, receiver: gen-server
+	\ Scenario 3 sender: user task, receiver: gen-server
 	: s3_gs1_response
 		t:name@ "%s received response %s" s:strfmt log
 	;
@@ -650,12 +650,49 @@ gen_server_test @ #if
 	\ ========================================
 	
 	\ ========================================
+	\ Scenario 4 : Sender : gen-server, receiver : GUI task.
+	: s4_repl_receive
+		t:name@ "%s received message %s" s:strfmt log
+	;
+	: s4_gen_server
+		t:name@ "%s received message %s" s:strfmt log
+		\ Message MAIN_TASK
+		"MAIN_TASK" ' s4_repl_receive ["Hi from GS-1"] msg!
+	;
+	\ We have to create gen-servers in a task for a GUI app.
+	: s4_task
+		"T-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		\ Don't throw
+		t:getq false q:throwing drop
+		\ Make the gen-server
+		"GS-1" gen_server_new
+		\ Kick the gen-server off
+		"GS-1" ' s4_gen_server ["Hi from T-1"] msg!
+		1 sleep
+		"GS-1" gen_server_term
+		"T-1" ' s3_task_receive ["term"] msg!
+	;
+	\ Scenario 4/5 need to be run separately from 1-3 as they require isgui set which will prevent v1-3 working.
+	\ true app:isgui !
+	: scenario-4
+		"*********Scenario 4 *********" log
+		\ Create user task and register it
+		' s4_task t:task "T-1" reg!
+		\ Register the main task so we can communicate
+		t:curtask "MAIN_TASK" reg!
+	;
+	\ ========================================
+	
+	\ ========================================
 	: app:main
-		scenario-1
+		\ scenario-1
+		\ 1 sleep
+		\ scenario-2
+		\ 1 sleep
+		\ scenario-3
 		1 sleep
-		scenario-2
-		1 sleep
-		scenario-3
+		scenario-4
 		con:key
 		bye
 	;
