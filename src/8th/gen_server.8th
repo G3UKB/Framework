@@ -87,6 +87,7 @@
  whether messaging is direct through the gen-server or through the pub/sub system which dispatches through gen-server.
  However, the pub-sub system should be used for all communication unless there is a reason for not doing so. 
  
+ \ non-GUI
  1. Sender : gen-server, receiver : gen-server. 
  		This is the simplest scenario as everything is managed by the gen-server. Messages are sent using msg!. If a response
  		task and word is included in the message then the response is automatically sent to the task using response!. Do not use msg!
@@ -103,21 +104,40 @@
  		msg@@. If a response is required then sender must call response@ as it will not automatically get the response. The usual place
  		top do that is immediately after msg!. Pre-requirements if it wants a response it must be registered and the user task must set
  		its task name with t:name! else +sender will get the default name and registry lookup will fail.
- 4.	Sender : gen-server, receiver : GUI task.
- 		This is similar to [2] above with the exception that the message is dispatched using g:do rather than to the message q. The message
- 		q and all synchronisation methods are inoperable in a GUI task. If the receiver wants to get a reply it can be sent by response!.
- 5. Sender : GUI task, receiver : gen-server.
- 		Again similar to [3] above. The GUI task uses msg! to send and if it wants to receive a reply can use response@ which sends through msg!
- 		which will dispatch via g:do.
+ 4.	Sender : gen-server, receiver : REPL,MAIN-TASK task.
+ 		This is similar to [2] above except the main task is the recipient. As this is not a GUI task the message is dispatched as normal to
+ 		the task q and therefore must be retrieved with msg@ or msg@@.
+ 5. Sender : REPL,MAIN-TASK task, receiver : gen-server.
+	 	Again similar to [3] above. The task uses msg! to send and if it wants to receive a reply it can use response@ to pick up the reply as
+ 		its not a gen-server.
+ \ GUI
+ 6.	Sender : gen-server, receiver : GUI task.
+  	This is similar to [2] above with the exception that the message is dispatched using g:do rather than to the message q. The message q 
+  	and all synchronisation methods are inoperable in a GUI app. If the receiver wants to get a reply it can be sent by response! and will 
+  	be automatically picked up by the gen-server task.
+ 7. Sender : GUI task, receiver : gen-server.
+	 	Again similar to [3] above. The task uses msg! to send and if it wants to receive a reply then this is sent via g:do as its a GUI app. 
+	 	The reply is picked up automatically.
 *)
 
 \ ========================================
 \ Testing only
-true var, gen_server_test
+false var, gen_server_test_normal
+true var, gen_server_test_gui
 
 \ ----------------------------------
-gen_server_test @ #if
+gen_server_test_normal @ #if
 	\ Includes
+	"E:/Projects/SDRLibEConsole/trunk/src/8th/harness/harness.8th" f:include
+	\ needs debug/sed
+	\ true SED-CHECK
+	\ needs debug/trace
+	\ dbg:line-info
+#then
+\ ----------------------------------
+gen_server_test_gui @ #if
+	\ Includes
+	"E:/Projects/SDRLibEConsole/trunk/src/8th/harness/harness.8th" f:include
 	\ needs debug/sed
 	\ true SED-CHECK
 	\ needs debug/trace
@@ -363,10 +383,17 @@ ns: fr.gs
 	swap m:@ nip
 	\ Check message destination
 	dup rot  \ task data
-	r> ["REPL" , "GUI", "MainTask"] ' cmp_task a:filter nip a:len nip 0 n:> if 
-		\ The destination is a main-task so we must use g:do
-		\ task data {"cb": w, "data":[value, sender]}
-		g:do
+	\ Check if we running a GUI app
+	app:isgui @ if
+		\ Yes, so check the target
+		r> ["REPL" , "GUI", "MAIN-TASK"] ' cmp_task a:filter nip a:len nip 0 n:> if 
+			\ The destination is a main-task so we must use g:do
+			\ task data {"cb": w, "data":[value, sender]}
+			g:do
+		else
+			\ Not a GUI app so we can dispatch to a q regardless
+			t:push t:q-notify
+		then
 	else
 		\ User task or gen-server so push message to task q 
 		t:push t:q-notify
@@ -473,7 +500,10 @@ ns: user
 \ Testing
 \ ===============================================================================
 
-gen_server_test @ #if
+\ ===============================================================================
+\ non-GUI tests
+
+gen_server_test_normal @ #if
 	with: fr.gs
 	
 	\ The functional tests execute each scenario as given in the docs intro.
@@ -650,16 +680,18 @@ gen_server_test @ #if
 	\ ========================================
 	
 	\ ========================================
-	\ Scenario 4 : Sender : gen-server, receiver : GUI task.
-	: s4_repl_receive
+	\ Scenario 4 : Sender : gen-server, receiver : REPL,MAIN-TASK task
+	: s4_main_receive
 		t:name@ "%s received message %s" s:strfmt log
+		true "main" t:!
 	;
 	: s4_gen_server
 		t:name@ "%s received message %s" s:strfmt log
 		\ Message MAIN_TASK
-		"MAIN_TASK" ' s4_repl_receive ["Hi from GS-1"] msg!
+		"MAIN_TASK" ' s4_main_receive ["Hi from GS-1"] msg!
 	;
 	\ We have to create gen-servers in a task for a GUI app.
+	\ Not necessary if it isn't but we do it anyway as this will be the normal use case.
 	: s4_task
 		"T-1" t:name!
 		t:name@ "%s running" s:strfmt log
@@ -673,28 +705,93 @@ gen_server_test @ #if
 		"GS-1" gen_server_term
 		"T-1" ' s3_task_receive ["term"] msg!
 	;
-	\ Scenario 4/5 need to be run separately from 1-3 as they require isgui set which will prevent v1-3 working.
-	\ true app:isgui !
+	
 	: scenario-4
 		"*********Scenario 4 *********" log
 		\ Create user task and register it
 		' s4_task t:task "T-1" reg!
 		\ Register the main task so we can communicate
-		t:curtask "MAIN_TASK" reg!
+		t:curtask "MAIN_TASK" dup t:name! reg!
+		false "main" t:!
+		repeat
+			"main" t:@ if break then
+			msg@@
+			0.1 sleep
+		again
+		"MAIN-TASK exiting" log
 	;
 	\ ========================================
 	
 	\ ========================================
+	\ Scenario 5 : Sender : REPL,MAIN-TASK task, receiver : gen-server
+	
+	\ ========================================
 	: app:main
-		\ scenario-1
-		\ 1 sleep
-		\ scenario-2
-		\ 1 sleep
-		\ scenario-3
+		scenario-1
+		1 sleep
+		scenario-2
+		1 sleep
+		scenario-3
 		1 sleep
 		scenario-4
-		con:key
+		1 sleep
+		"********* Test Complete *********" log
+		1 sleep
 		bye
+	;
+#then
+
+\ ===============================================================================
+\ GUI  tests
+
+gen_server_test_gui @ #if
+	with: fr.gs	
+	with: harness
+	\ ========================================
+	\ Scenario 6 : Sender : gen-server, receiver : GUI task
+	: s6_main_receive
+		t:name@ "%s received message %s" s:strfmt log
+		true "main" t:!
+	;
+	: s6_gen_server
+		t:name@ "%s received message %s" s:strfmt log
+		\ Message MAIN-TASK
+		"MAIN-TASK" ' s6_main_receive ["Hi from GS-1"] msg!
+	;
+	\ We have to create gen-servers in a task for a GUI app.
+	: s6_task
+		"T-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		\ Don't throw
+		t:getq false q:throwing drop
+		\ Make the gen-server
+		"GS-1" gen_server_new
+		\ Kick the gen-server off
+		"GS-1" ' s6_gen_server ["Hi from T-1"] msg!
+		1 sleep
+		"GS-1" gen_server_term
+		"T-1" ' s6_task_receive ["term"] msg!
+	;
+	
+	: scenario-6
+		"*********Scenario 6 *********" log
+		\ Create user task and register it
+		' s6_task t:task "T-1" reg!
+		\ Register the main task so we can communicate
+		t:curtask "MAIN-TASK" dup t:name! reg!
+		\ Create a window so we can exit the test
+		harness_window
+		"MAIN-TASK exiting" log
+	;
+	\ ========================================
+	
+	\ ========================================
+	\ Scenario 7 : Sender :  GUI task, receiver : gen-server
+	
+	\ ========================================
+	true app:isgui !
+	: app:main
+		scenario-6
 	;
 	
 #then
