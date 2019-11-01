@@ -20,14 +20,16 @@
  
   The author can be reached by email at:   
      bob@bobcowdery.plus.com
-     
+  
+  -----------------------------------------------------------------------------
+  The publish/subscribe system is a layer on top of gen_server. It should be the
+  primary means of communication between tasks and within tasks. It's a thin layer
+  but provides a level of abstraction so senders and receivers are decoupled.
+  
   The public interface can be called from any task.
   Subscribers subscribe to a topic and provide a task name and a word to call.
-  Publishers publish to a topic with data to send via a gen-server. There are no
+  Publishers publish to a topic with data to send via a gen-server msg!. There are no
   direct calls. All data is sent via messages to the subscribing tasks.
-  
-  Note that this should be used for one way calls although there is nothing to
-  prevent a reply by agreement between sender and receiver [see gen_server].
   
   PUBLIC INTERFACE:
 	  
@@ -106,14 +108,8 @@ with: fr.gs
 	\ Do not dispatch to the publisher if the publisher is also a subscriber on the same word
 	\ This happens in the GUI task as many UI fragments may subscribe to and publish the same event.
 	1 pick dup t:name@ s:= not if
-	 \ Test for dispatch type
-	 {"REPL":1 , "GUI":1, "MainTask":1} swap m:exists? nip if
-			\ Can't message to a Q, so dispatch via g:do
-			m:new "cb" rot m:! 2 pick "data" swap m:! g:do drop
-		else
-			\ A task, so dispatch via normal messaging
-			2 pick msg!
-		then
+		\ Dispatch to msg!. If this needs to be a g:do that is handled by the gen-server.
+		2 pick msg!
 	else
 		\ Just clean up
 		3drop
@@ -124,7 +120,7 @@ with: fr.gs
 \ ===============================================================================
 \ PUBLIC Call level Interface
 \ ===============================================================================
-
+\ ToDo: Have a subscription id
 \ ----------------------------------
 \ Subscribe to a topic	
 : subscribe	SED: s w s --
@@ -149,6 +145,7 @@ with: fr.gs
 ;
 
 \ ----------------------------------
+\ ToDo: Have an exclusion list of subscription id's so that we don't create publish loops.
 \ Publish to a topic	
 : publish	SED: * s --
 	\ in:		s - topic to publish to 	
