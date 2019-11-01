@@ -103,7 +103,8 @@ with: fr.gs
 	\				* - opaque data to send
 	\ out:	none
 	a:open 	\ * task-name w
-	\ Do not dispatch if the publisher is also the subscriber
+	\ Do not dispatch to the publisher if the publisher is also a subscriber on the same word
+	\ This happens in the GUI task as many UI fragments may subscribe to and publish the same event.
 	1 pick dup t:name@ s:= not if
 	 \ Test for dispatch type
 	 {"REPL":1 , "GUI":1, "MainTask":1} swap m:exists? nip if
