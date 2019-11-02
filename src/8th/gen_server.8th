@@ -294,7 +294,7 @@ ns: fr.gs
 	\ very hard to find.
 	-1 -1
 	\ Set initial depth limit to 3 (T + underflow items)
-	3 "depth" t:!
+	5 "depth" t:!
 	\ Loop while run enabled
 	repeat
 		\ Wait for a wake up notify

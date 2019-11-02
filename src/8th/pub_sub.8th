@@ -53,11 +53,12 @@ needs stack/3drop
 
 \ ========================================
 \ Testing only
-false var, pub_sub_test
+true var, pub_sub_test
 
 \ ----------------------------------
 pub_sub_test @ #if
 	\ Includes
+	"E:/Projects/SDRLibEConsole/trunk/src/8th/harness/harness.8th" f:include
 	"gen_server.8th" f:include
 	\ needs debug/sed
 	\ true SED-CHECK
@@ -105,22 +106,20 @@ with: fr.gs
 	\				* - opaque data to send
 	\ out:	none
 	a:open 	\ * task-name w
-	\ Do not dispatch to the publisher if the publisher is also a subscriber on the same word
-	\ This happens in the GUI task as many UI fragments may subscribe to and publish the same event.
-	1 pick dup t:name@ s:= not if
-		\ Dispatch to msg!. If this needs to be a g:do that is handled by the gen-server.
-		2 pick msg!
-	else
-		\ Just clean up
-		3drop
-	then
+	\ May need to enhance this as I think there is a possibility of creating a loop. In
+	\ particular a GUI may publish off an event but may also subscribe to the same event.
+	\ For example a user click tunes on a panadapter. This generates a freq event which several
+	\ other GUI elements subscribe to. We have to be sure we don't mistake the update for something
+	\ we need to propogate, thus creating a loop. It may be hard to guard against this.
+	\ Dispatch to msg!. If this needs to be a g:do that is handled by the gen-server.
+	2 pick msg!
 ;
 	
 \ ===============================================================================
 \ ===============================================================================
 \ PUBLIC Call level Interface
 \ ===============================================================================
-\ ToDo: Have a subscription id
+
 \ ----------------------------------
 \ Subscribe to a topic	
 : subscribe	SED: s w s --
@@ -128,12 +127,12 @@ with: fr.gs
 	\				w - word to invoke in task
 	\				s - task name to publish to
 	\ out:	none
-	__ps_lock@ 
-	1 pick m:exists? not if	\ t-name word topic ps
+	__ps_lock@
+	1 pick m:exists? not if \ t-name word topic ps
 		\ Topic does not exist so create
-		a:new 4 pick a:push 3 pick a:push	\ t-name word topic ps [t-name, w]
-		a:new swap a:push	\ t-name word topic ps [[t-name, w]]
-		swap 2 pick rot m:!	\ t-name word topic ps
+		a:new 4 pick a:push 3 pick a:push \ t-name word topic ps [t-name, w]
+		a:new swap a:push \ t-name word topic ps [[t-name, w]]
+		swap 2 pick rot m:! \ t-name word topic ps
 	else
 		\ Topic exists
 		1 pick m:@ \ t-name word topic ps [[t-name, w], ...]
@@ -145,12 +144,11 @@ with: fr.gs
 ;
 
 \ ----------------------------------
-\ ToDo: Have an exclusion list of subscription id's so that we don't create publish loops.
 \ Publish to a topic	
 : publish	SED: * s --
 	\ in:		s - topic to publish to 	
 	\				* - opaque data to send
-	\ out:	none	
+	\ out:	none
 	__ps_lock@ 
 	1 pick m:exists? not if
 		\ At this point it is an error
@@ -163,6 +161,34 @@ with: fr.gs
 ;
 
 \ ========================================
+\ Indirect publish
+\ Called by the gen-server to complete the publish
+: __publish SED: a --
+	a:open publish
+;
+
+\ Publish via the gen-server task
+: publish!	SED: * s --	
+	2 a:close "PUB-SUB-TASK" ' __publish rot msg!
+;
+
+\ ----------------------------------
+: pubsub_init	SED: --
+	\ We create a gen-server to use to publish when we cannot do so directly.
+	\ This occurs e.g. when we are in a GUI callback and we want to publish something
+	\ that could call back into the GUI task. This would lock the event loop.
+	"PUB-SUB-TASK" gen_server_new
+;
+
+\ ----------------------------------
+: pubsub_term	SED: --
+	\ We create a gen-server to use to publish when we cannot doso directly
+	\ This occurs e.g. when we are in a GUI callback and we want to publish something
+	\ that could call back into the GUI task which would not be allowed.
+	"PUB-SUB-TASK" gen_server_term
+;
+
+\ ========================================
 \ Reset namespace
 ns: user
 
@@ -172,150 +198,157 @@ ns: user
 \ ===============================================================================
 
 pub_sub_test @ #if
-	(*
-		For a minimal test:
-		1. Have words that receive published messages and print the data.
-		2. Have words that subscribe to a topic.
-		3. Have words that publish to a topic.
-		4. Create n gen-servers.
-		5. Send a message via each gen-server to words in 2.
-		6. Send a message via each gen-server to words in 3.
-		7. The words in 1 should receive the messages unless publisher == subscriber.
-	*)
-	
 	with: fr.gs
 	with: fr.ps
+	with: harness
 	
-	4 json-pretty
-	
-	\ Receivers
-	: receiver1	SED: * --
-		"Called receiver1 with %s" s:strfmt log
-	;
-	
-	: receiver2	SED: * --
-		"Called receiver2 with %s" s:strfmt log
-	;
-	
-	: receiver3	SED: * --
-		"Called receiver3 with %s" s:strfmt log
-	;
+	(*
+		This is a layer ontop on gen-server and therefore has the same set of rules that
+		apply to direct communication via gen-server and its associated words.
 		
-	: receiver4	SED: * --
-		"Called receiver4 with %s" s:strfmt log
-	;
-	
-	\ Subscribers
-	: subscriber1 SED: * --
-		drop t:name@ ' receiver1 "Topic-1" subscribe
-	;
-	
-	: subscriber2 SED: * --
-		drop t:name@ ' receiver2 "Topic-2" subscribe
-	;
-	
-	: subscriber3 SED: * --
-		drop t:name@ ' receiver3 "Topic-3" subscribe
-	;
+		We test this by creating the set of possible sources and sinks and then create a 
+		matrix of one-way messages. We then repeat with responses.
 		
-	: subscriber4 SED: * --
-		drop t:name@ ' receiver4 "Topic-4" subscribe
-	;
-	\ Both to same topic
-	: subscriber1.1 SED: * --
-		drop t:name@ ' receiver1 "Topic-1" subscribe
-	;
-
-	: subscriber1.2 SED: * --
-		drop t:name@ ' receiver2 "Topic-1" subscribe
-	;
-	
-	\ Publishers
-	: publisher1 SED: * --
-		drop "Data-1" "Topic-1" publish
-	;
+		We will nearly always be working with a GUI app so the tests assume this environment.
 		
-	: publisher2 SED: * --
-		drop "Data-2" "Topic-2" publish
+		1. Create a gen-server GS-1 and a user-task UT-1.
+		2. Subscribe to TOPIC-1 from MAIN-TASK, GS-1 and UT-1.
+		3. Subscribe to TOPIC-2 from from MAIN-TASK, GS-1 and UT-1.
+		4. Subscribe to TOPIC-3 from from MAIN-TASK, GS-1 and UT-1.
+		5. Publish TOPIC-2 from UT-1.
+		6. Publish TOPIC-3 from GS-1. 
+		7. From a GUI button click publish! TOPIC-1, 2 and 3.
+	*)
+	
+	\ ========================================
+	\ Gen-server subscription words
+	: gs1_task_subs_1
+		t:name@ "TOPIC-1" "%s: %s received message: %s" s:strfmt log
+	;
+	: gs1_task_subs_2
+		t:name@ "TOPIC-2" "%s: %s received message: %s" s:strfmt log
+	;
+	: gs1_task_subs_3
+			t:name@ "TOPIC-3" "%s: %s received message: %s" s:strfmt log
+	;
+	: gs1_subscribe
+		"GS-1" ' gs1_task_subs_1 "TOPIC-1" subscribe
+		"GS-1" ' gs1_task_subs_2 "TOPIC-2" subscribe
+		"GS-1" ' gs1_task_subs_3 "TOPIC-3" subscribe
+	;
+	: gs1_publish
+		"GS-1 task data" "TOPIC-3" publish
 	;
 	
-	: publisher3 SED: * --
-		drop "Data-3" "Topic-3" publish
+	\ ========================================
+	\ User task subscription words
+	: ut1_task_subs_1
+		t:name@ "TOPIC-1" "%s: %s received message: %s" s:strfmt log
 	;
-			
-	: publisher4 SED: * --
-		drop "Data-4" "Topic-4" publish
-	;	
-	
-	\ This subscriber will be on the main thread
-	: reg_task
-		\ Must register REPL in the task repos to be able to reply
-		t:curtask t:name@ reg!
-		\ Set q to null on empty
-		t:getq false q:throwing \ do not drop q else crashes
+	: ut1_task_subs_2
+		t:name@ "TOPIC-2" "%s: %s received message: %s" s:strfmt log
 	;
-	
-	: main_thrd_receiver	SED: * --
-		"Called main_thrd_receiver with %s" s:strfmt log
+	: ut1_task_subs_3
+		t:name@ "TOPIC-3" "%s: %s received message: %s" s:strfmt log
+	;
+	: ut1_term
+		true "user-task" t:!
 	;
 	
-	: main_thrd_subscriber SED:  --
-		t:name@ ' main_thrd_receiver "Topic-1" subscribe
+	\ ========================================
+	\ Normal user task for communication
+	: user_task
+		"UT-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		\ Don't throw
+		t:getq false q:throwing drop
+		"UT-1" ' ut1_task_subs_1 "TOPIC-1" subscribe
+		"UT-1" ' ut1_task_subs_2 "TOPIC-2" subscribe
+		"UT-1" ' ut1_task_subs_3 "TOPIC-3" subscribe
+		2 sleep
+		"User task data" "TOPIC-2" publish
+		"GS-1" ' gs1_publish null msg!
+		false "user-task" t:!
+		repeat
+			"user-task" t:@ if break then
+			msg@@
+			0.1 sleep
+		again
+		"UT-1 exiting" log
 	;
 	
-	: runtest
-		\ Create tasks
-		"Task-1" gen_server_new
-		"Task-2" gen_server_new
-		"Task-3" gen_server_new
-		"Task-4" gen_server_new
-		"Task-5" gen_server_new
-		"Task-6" gen_server_new
-		"Task-7" gen_server_new
-		"Task-8" gen_server_new
-		\ Subscribe
-		\ Register main  task
-		reg_task
-		\ and subscribe from main thread
-		main_thrd_subscriber
-		\ Task subscriptions
-		"Task-1" ' subscriber1 null msg!
-		"Task-1" ' subscriber1.2 null msg!
-		"Task-2" ' subscriber2 null msg!
-		"Task-3" ' subscriber3 null msg!
-		"Task-4" ' subscriber4 null msg!
+	\ ========================================
+	\ We have to create gen-servers in a task for a GUI app.
+	: startup_task
+		"STARTUP" t:name!
+		t:name@ "%s running" s:strfmt log
+		\ Don't throw
+		t:getq false q:throwing drop
+		\ Init pubsub system
+		pubsub_init
+		\ Make a gen-server
+		"GS-1" gen_server_new
+		"GS-1" ' gs1_subscribe null msg!
+		\ Make a normal user task
+		' user_task t:task "UT-1" reg!
+	;
+	
+	\ ========================================
+	\ GUI task events
+	: button_clicked
+		 "Button-clicked data" "TOPIC-1" publish!
+		 "Button-clicked data" "TOPIC-2" publish!
+		 "Button-clicked data" "TOPIC-3" publish!
+	;
+	
+	\ ========================================
+	\ GUI task subscriber words
+	: gui_subs_1
+		t:name@ "TOPIC-1" "%s: %s received message: %s" s:strfmt log
+	;
+	: gui_subs_2
+		t:name@ "TOPIC-2" "%s: %s received message: %s" s:strfmt log
+	;
+	: gui_subs_3
+		t:name@ "TOPIC-3" "%s: %s received message: %s" s:strfmt log
+	;
+	
+	\ ========================================
+		\ Termination
+	: terminate
+		false log-async
+		"UT-1" ' ut1_term null msg!
+		0.1 sleep
+		pubsub_term
+		0.1 sleep
+		"GS-1" gen_server_term
+		wait_all
 		1 sleep
-		\ Publish
-		\ These will not call subscribers as publisher == subscriber
-		\ Except Task-1 which will publish to REPL via g:do as well as Task-1
-		"Task-1" ' publisher1 null msg!
-		"Task-2" ' publisher2 null msg!
-		"Task-3" ' publisher3 null msg!
-		"Task-4" ' publisher4 null msg!
-		\ These will call subscribers
-		"Task-5" ' publisher1 null msg!
-		"Task-6" ' publisher2 null msg!
-		"Task-7" ' publisher3 null msg!
-		"Task-8" ' publisher4 null msg!
-		1 sleep
-		\ Close servers
-		"Task-1" gen_server_term
-		"Task-2" gen_server_term
-		"Task-3" gen_server_term
-		"Task-4" gen_server_term
-		"Task-5" gen_server_term
-		"Task-6" gen_server_term
-		"Task-7" gen_server_term
-		"Task-8" gen_server_term
-		1 sleep
-		\ Wait for completion
-		wait_all  
-		"Test complete" log
-		1 sleep
 	;
 	
-	runtest
-	bye
+	\ ========================================
+	\ Main script
+	: script
+		"********* Pub/Sub matrix test *********" log
+		\ Create user task and register it
+		' startup_task t:task "STARTUP" reg!
+		\ Register the main task so we can communicate
+		t:curtask "MAIN-TASK" dup t:name! reg!
+		\ Create a window with one button
+		harness_window
+		1 sleep
+		\ Do GUI task subscriptions
+		"MAIN-TASK" ' gui_subs_1 "TOPIC-1" subscribe
+		"MAIN-TASK" ' gui_subs_2 "TOPIC-2" subscribe
+		"MAIN-TASK" ' gui_subs_3 "TOPIC-3" subscribe
+		\ Set closedown
+		' terminate onexit
+	;
 	
-#then
-	
+	\ ========================================
+	true app:isgui !
+	: app:main
+		script
+		"app:main exiting" log
+	;
+#then	
