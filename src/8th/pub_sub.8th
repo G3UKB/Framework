@@ -22,9 +22,17 @@
      bob@bobcowdery.plus.com
   
   -----------------------------------------------------------------------------
-  The publish/subscribe system is a layer on top of gen_server. It should be the
-  primary means of communication between tasks and within tasks. It's a thin layer
+  The publish/subscribe system is a layer on top of gen_server. It's a thin layer
   but provides a level of abstraction so senders and receivers are decoupled.
+  
+  Pub/sub should be used primarily for send and forget operation that happen multiple
+  times or are sent to a number of variable receivers, during the applications runtime.
+  Good examples are radio controls such as frequency, mode etc although there are many
+  others. It's perfectly possible to get a response to a publish as it's just a layer 
+  over gen-server. Hopwever if you need a response consider using direct messaging.
+  Pub?Sub should generally not be used for one off operations or infrequent operations
+  such are discovery and starting the radio. For this use direct messaging. There will
+  always be special cases and exceptions where the rules should be broken.
   
   The public interface can be called from any task.
   Subscribers subscribe to a topic and provide a task name and a word to call.
@@ -53,7 +61,7 @@ needs stack/3drop
 
 \ ========================================
 \ Testing only
-true var, pub_sub_test
+false var, pub_sub_test
 
 \ ----------------------------------
 pub_sub_test @ #if
