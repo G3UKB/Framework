@@ -125,13 +125,13 @@ with: fr.gs
 	1 pick m:exists? not if \ t-name word topic ps
 		\ Topic does not exist so create
 		a:new 4 pick a:push 3 pick a:push \ t-name word topic ps [t-name, w]
-		a:new swap a:push \ t-name word topic ps [[t-name, w]]
+		a:new swap a:push 	\ t-name word topic ps [[t-name, w]]
 		swap 2 pick rot m:! \ t-name word topic ps
 	else
 		\ Topic exists
 		1 pick m:@ \ t-name word topic ps [[t-name, w], ...]
 		a:new 5 pick a:push 4 pick a:push \ t-name word topic ps [[t-name, w], ...] [t-name, w]
-		a:push \ t-name word topic ps [[t-name, w], ... , [t-name, w]] 
+		a:push drop \ t-name word topic ps [[t-name, w], ... , [t-name, w]] 
 	then
 	__ps_unlock
 	2drop 2drop
