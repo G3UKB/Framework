@@ -1,0 +1,469 @@
+(* 
+	gen_server.test.8th
+ 
+  Test harness for gen_server.8th
+ 
+ Copyright C 2019 by G3UKB Bob Cowdery
+ This program is free software; you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation; either version 2 of the License, or
+ at your option any later version.
+ 
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+ 
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ 
+  The author can be reached by email at:   
+     bob@bobcowdery.plus.com
+ *)
+ 
+\ ========================================
+\ Includes
+"../gen_server.8th" f:include
+"../pub_sub.8th" f:include
+"E:/Projects/SDRLibEConsole/trunk/src/8th/common/app_defs.8th" f:include
+"E:/Projects/SDRLibEConsole/trunk/src/8th/common/radio_defs.8th" f:include
+"E:/Projects/SDRLibEConsole/trunk/src/8th/common/ps_events.8th" f:include
+"E:/Projects/SDRLibEConsole/trunk/src/8th/connector/connector.8th" f:include
+"E:/Projects/SDRLibEConsole/trunk/src/8th/harness/harness.8th" f:include
+
+\ ========================================
+\ Debug Settings
+\ needs debug/sed
+\ true SED-CHECK
+\ needs debug/trace
+\ dbg:line-info
+
+\ ========================================
+\ Test code
+with: sdr
+with: fr.gs
+with: fr.ps
+with: harness
+
+4 json-pretty
+
+\ The functional tests execute each scenario as given in the docs intro in gen-server.8th.
+\ Words called by messaging system
+\ Change for GUI tests
+false var, gen_server_test_normal
+false var, gen_server_test_gui_1
+true var, gen_server_test_gui_2
+
+gen_server_test_normal @ #if
+	\ ========================================
+	\ Scenario 1: sender: gen-server, receiver: gen-server
+	: s1_gs1_response
+		t:name@ "%s received response %s" s:strfmt log
+	;
+	: s1_gs1_receive
+		t:name@ "%s received message %s" s:strfmt log
+	;
+	: s1_gs2_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data
+		is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from GS-2"] response!
+		then
+	;
+	: s1_repl_receive
+		\ Initial receive to kick off exchanges between GS-1 and GS-2
+		t:name@ "%s received message %s" s:strfmt log
+		\ We are now in GS-1 so we can send a message to GS-2
+		\ The message must be an array
+		"GS-2" ' s1_gs2_receive ["Hi from GS-1"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"GS-2" ' s1_gs2_receive ["Hi from GS-1"] ' s1_gs1_response +sender msg!
+	;	
+	: scenario-1
+		"*********Scenario 1 *********" log
+		\ Create two gen-servers
+		\ Note that we get nothing back, simply use the name to communicate
+		\ Also as this is not a GUI task yet we can create these on the main thread
+		"GS-1" gen_server_new
+		"GS-2" gen_server_new
+		\ Send a message from REPL to GS-1 to start things rolling
+		"GS-1" ' s1_repl_receive ["Hi from REPL"] msg!
+		1 sleep
+		"GS-1" gen_server_term
+		"GS-2" gen_server_term
+	;
+	\ ========================================
+
+	\ ========================================
+	\ Scenario 2 sender: gen-server, receiver: user task
+	: s2_gs1_response
+		t:name@ "%s received response %s" s:strfmt log
+	;
+	: s2_gs2_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data
+		is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from GS-2"] response!
+		then
+	;
+	: s2_task_response
+			t:name@ "%s received response %s" s:strfmt log
+	;
+	: s2_task_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for termination
+		0 a:@ "term" s:= if true "t1" t:! then 
+		\ Test for response data
+		is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from T-1"] response!
+		then
+	;
+	: s2_task
+		"T-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		false "t1" t:!
+		repeat
+			"t1" t:@ if break then
+			msg@@
+			0.1 sleep
+		again
+		t:name@ "%s exiting" s:strfmt log
+	;
+	: s2_repl_receive
+		\ Initial receive to kick off exchanges between GS-1 and T-1
+		t:name@ "%s received message %s" s:strfmt log
+		\ We are now in GS-1 so we can send a message to T-1
+		\ The message must be an array
+		"T-1" ' s2_task_receive ["Hi from GS-1"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"T-1" ' s2_task_receive ["Hi from GS-1"] ' s2_gs1_response +sender msg!
+	;	
+	: scenario-2
+		"*********Scenario 2 *********" log
+		\ Create one gen-server and one task
+		\ Note that we get nothing back, simply use the name to communicate
+		\ Also as this is not a GUI task yet we can create this on the main thread
+		"GS-1" gen_server_new
+		\ Create user task and register it
+		' s2_task t:task "T-1" reg!
+		\ Send a message from REPL to GS-1 to start things rolling
+		"GS-1" ' s2_repl_receive ["Hi from REPL"] msg!
+		1 sleep
+		"GS-1" gen_server_term
+		"T-1" ' s2_task_receive ["term"] msg!
+	;
+	\ ========================================
+
+	\ ========================================
+	\ Scenario 3 sender: user task, receiver: gen-server
+	: s3_gs1_response
+		t:name@ "%s received response %s" s:strfmt log
+	;
+	: s3_gs1_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data
+		is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from GS-2"] response!
+		then
+	;
+	: s3_task_response
+			t:name@ "%s received response %s" s:strfmt log
+	;
+	: s3_task_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for termination
+		0 a:@ "term" s:= if true "t1" t:! then 
+		\ Test for response data
+		is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from T-1"] response!
+		then
+	;
+	: s3_task
+		\ Must set task name else +sender will get the defult name and lookup will fail.
+		"T-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		\ Don't throw
+		t:getq false q:throwing drop
+		false "t1" t:!
+		repeat
+			"t1" t:@ if break then
+			msg@@
+			0.1 sleep
+		again
+		t:name@ "%s exiting" s:strfmt log
+	;
+	: s3_repl_receive
+		\ Initial receive to kick off exchanges between T-1 and GS-1
+		t:name@ "%s received message %s" s:strfmt log
+		\ We are now in T-1 so we can send a message to T-1
+		\ The message must be an array
+		"GS-1" ' s3_gs2_receive ["Hi from T-1"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"GS-1" ' s3_gs1_receive ["Hi from T-1"] ' s3_task_response +sender msg! response@
+	;	
+	: scenario-3
+		"*********Scenario 3 *********" log
+		\ Create one gen-server and one task
+		\ Note that we get nothing back, simply use the name to communicate
+		\ Also as this is not a GUI task yet we can create this on the main thread
+		"GS-1" gen_server_new
+		\ Create user task and register it
+		' s3_task t:task "T-1" reg!
+		\ Send a message from REPL to T-1 to start things rolling
+		"T-1" ' s3_repl_receive ["Hi from REPL"] msg!
+		1 sleep
+		"GS-1" gen_server_term
+		"T-1" ' s3_task_receive ["term"] msg!
+	;
+	\ ========================================
+
+	\ ========================================
+	\ Scenario 4 : Sender : gen-server, receiver : REPL,MAIN-TASK task
+	: s4_main_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data
+		is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from T-1"] response!
+		then
+		true "main" t:!
+	;
+	: s4_gs_1_response
+		t:name@ "%s received response %s" s:strfmt log
+	;	
+	: s4_gen_server
+		t:name@ "%s received message %s" s:strfmt log
+		\ Message MAIN_TASK
+		"MAIN-TASK" ' s4_main_receive ["Hi from GS-1"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"MAIN-TASK" ' s4_main_receive ["Hi from GS-1"] ' s4_gs_1_response +sender msg!
+	;
+	: s4_task_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for termination
+		0 a:@ "term" s:= if true "t1" t:! then 
+		\ Test for response data
+		is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from T-1"] response!
+		then
+	;
+	\ We have to create gen-servers in a task for a GUI app.
+	\ Not necessary if it isn't but we do it anyway as this will be the normal use case.
+	: s4_task
+		"T-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		\ Don't throw
+		t:getq false q:throwing drop
+		\ Make the gen-server
+		"GS-1" gen_server_new
+		\ Kick the gen-server off
+		"GS-1" ' s4_gen_server ["Hi from T-1"] msg!
+		1 sleep
+		"GS-1" gen_server_term
+		"T-1" ' s4_task_receive ["term"] msg!
+	;
+
+	: scenario-4
+		"*********Scenario 4 *********" log
+		\ Create user task and register it
+		' s4_task t:task "T-1" reg!
+		\ Register the main task so we can communicate
+		t:curtask "MAIN-TASK" dup t:name! reg!
+		false "main" t:!
+		repeat
+			"main" t:@ if break then
+			msg@@
+			0.1 sleep
+		again
+		"MAIN-TASK exiting" log
+	;
+	\ ========================================
+
+	\ ========================================
+	\ Scenario 5 : Sender : REPL,MAIN-TASK task, receiver : gen-server
+	: s5_gs_1_receive
+		\ Initial receive to kick off exchanges between REPL and GS-1
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data
+		is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from GS-1"] response!
+		then
+	;	
+	: s5_gs_1_response
+		t:name@ "%s received response %s" s:strfmt log
+		true "main" t:!
+	;
+	: scenario-5
+		"*********Scenario 5 *********" log
+		\ Make the gen-server
+		"GS-1" gen_server_new
+		\ Register the main task so we can communicate
+		t:curtask "MAIN-TASK" dup t:name! reg!
+		\ Send a message from REPL to GS-1
+		"GS-1" ' s5_gs_1_receive ["Hi from REPL"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"GS-1" ' s5_gs_1_receive ["Hi from REPL"] ' s5_gs_1_response +sender msg!
+		1 sleep
+		false "main" t:!
+		repeat
+			"main" t:@ if break then
+			msg@@
+			0.1 sleep
+		again
+		"GS-1" gen_server_term
+	;
+
+	\ ========================================
+	: app:main
+		scenario-1
+		1 sleep
+		scenario-2
+		1 sleep
+		scenario-3
+		1 sleep
+		scenario-4
+		1 sleep
+		scenario-5
+		1 sleep
+		"********* Test Complete *********" log
+		1 sleep
+		bye
+	;
+#then
+
+\ ===============================================================================
+\ GUI  tests
+
+gen_server_test_gui_1 @ #if
+
+	\ ========================================
+	\ Scenario 6 : Sender : gen-server, receiver : GUI task
+	: s6_gs1_response
+			t:name@ "%s received response %s" s:strfmt log
+	;
+	\ Received via a g:do so format is different
+	\ { "cb": _, "data": -}
+	: s6_main_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data, only want the data part to test
+		"data" m:@ is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from MAIN-TASK"] response!
+		then
+	;
+	: s6_gen_server
+		t:name@ "%s received message %s" s:strfmt log
+		\ Message MAIN-TASK
+		"MAIN-TASK" ' s6_main_receive ["Hi from GS-1"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"MAIN-TASK" ' s6_main_receive ["Hi from GS-1"] ' s6_gs1_response +sender msg!
+	;
+	\ We have to create gen-servers in a task for a GUI app.
+	: s6_task
+		"T-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		\ Don't throw
+		t:getq false q:throwing drop
+		\ Make the gen-server
+		"GS-1" gen_server_new
+		\ Kick the gen-server off
+		"GS-1" ' s6_gen_server ["Hi from T-1"] msg!
+		2 sleep
+		"GS-1" gen_server_term
+		"T-1" ' s6_task_receive ["term"] msg!
+	;
+	
+	: scenario-6
+		"*********Scenario 6 *********" log
+		\ Create user task and register it
+		' s6_task t:task "T-1" reg!
+		\ Register the main task so we can communicate
+		t:curtask "MAIN-TASK" dup t:name! reg!
+		\ Create a window so we can exit the test
+		harness_basic_window
+	;
+	\ ========================================
+	
+		true app:isgui !
+		: app:main
+			scenario-6
+			"app:main exiting" log
+	;
+#then
+
+gen_server_test_gui_2 @ #if
+	with: fr.gs	
+	with: harness
+	
+	\ ========================================
+	\ Scenario 7 : Sender :  GUI task, receiver : gen-server
+	: s7_gs1_response
+			t:name@ "%s received response %s" s:strfmt log
+	;
+	\ Received via a g:do so format is different
+	\ { "cb": _, "data": -}
+	: s7_main_receive
+		dup t:name@ "%s received message %s" s:strfmt log
+		\ Test for response data, only want the data part to test
+		"data" m:@ is_response? if
+			\ Good response data with a valid word to invoke
+			["Response from MAIN-TASK"] response!
+		then
+	;
+	: s7_gen_server
+		t:name@ "%s received message %s" s:strfmt log
+		\ Message MAIN-TASK
+		"MAIN-TASK" ' s7_main_receive ["Hi from GS-1"] msg!
+		\ Now one that requirs a reply
+		\ Here the message array is augmented with a task name and word to respond to.
+		"MAIN-TASK" ' s7_main_receive ["Hi from GS-1"] ' s7_gs1_response +sender msg!
+	;
+	\ We have to create gen-servers in a task for a GUI app.
+	: s7_task
+		"T-1" t:name!
+		t:name@ "%s running" s:strfmt log
+		\ Don't throw
+		t:getq false q:throwing drop
+		\ Make the gen-server
+		"GS-1" gen_server_new
+		\ Kick the gen-server off
+		"GS-1" ' s7_gen_server ["Hi from T-1"] msg!
+		2 sleep
+		"GS-1" gen_server_term
+		"T-1" ' s7_task_receive ["term"] msg!
+	;
+
+	: scenario-7
+		"*********Scenario 7 *********" log
+		\ Create user task and register it
+		' s7_task t:task "T-1" reg!
+		\ Register the main task so we can communicate
+		t:curtask "MAIN-TASK" dup t:name! reg!
+		\ Create a window so we can exit the test
+		harness_basic_window
+		1 sleep
+	;
+	\ ========================================
+	
+	\ ========================================
+	true app:isgui !
+	: app:main
+		scenario-7
+		"app:main exiting" log
+	;
+	
+#then
