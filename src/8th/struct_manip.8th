@@ -42,17 +42,6 @@
 *)
 
 \ ========================================
-\ Testing only
-false var, struct_manip_test
-
-struct_manip_test @ #if
-	\ Includes
-	\ needs debug/sed
-	\ true SED-CHECK
-	\ dbg:line-info
-#then
-
-\ ========================================
 \ Set namespace
 ns: fr.sm
 
@@ -66,6 +55,7 @@ ns: fr.sm
 \ ========================================
 \ Check for sensible stack for array and map access words.
 \ Throw an exception if it looks wrong with all info we can obtain.
+\ Not implemented at present.
 
 : __a@	SED:  a n --  		
 	\	in:		n - index
@@ -179,93 +169,3 @@ ns: fr.sm
 \ ========================================
 \ Reset namespace
 ns: user
-
-\ ===============================================================================
-\ ===============================================================================
-\ Testing
-\ ===============================================================================
-
-struct_manip_test @ #if
-	with: fr.sm
-	4 json-pretty
-	
-	\ Test structures
-	[
-		["val-1", "val-2", "val-3"],
-		["outer", ["val-1", "val-2", "val-3"]],
-		["outer", "inner", ["val-1", "val-2", "val-3"]]
-	] var, array
-	
-	{
-		"map-1" : {	
-			"key-1" : 	["val-1", "val-2", "val-3"],
-			"key-2" : 	["outer", ["val-1", "val-2", "val-3"]],
-			"key-3" : 	["outer", "inner", ["val-1", "val-2", "val-3"]],
-			"key-4" : 	{"inner-key" : ["val-1", "val-2", "val-3"]},
-			"key-5" : 	{"inner-key" : {"inner-key-1" : ["val-1", "val-2", "val-3"]}}
-		},
-		"map-2" : {	
-				"key-1" : 	[0, ["val-1", "val-2", "val-3"]],
-				"key-2" : 	[1, "inner", ["val-1", "val-2", "val-3"]],
-				"key-3" : 	{"inner-key" : [1,["val-1", "val-2", "val-3"]]},
-				"key-4" : 	[2, {"inner-key-1" : ["val-1", "val-2", "val-3"]}]
-		}
-	} var, map
-
-	\ =========================================================================
-	\ Getter examples
-	: getter_examples
-		"Array access" . cr
-		array @ [0,1] val@ . cr
-		array @ [1,1,1] val@ . cr
-		array @ [2,1] val@ . cr
-		array @ [2,2,2] val@ . cr
-		
-		"Map/Array access" . cr
-		map @ ["map-1","key-1",2] val@ . cr
-		map @ ["map-1","key-2",1,2] val@ . cr
-		map @ ["map-1","key-3",1] val@ . cr
-		map @ ["map-1","key-3",2,2] val@ . cr
-		map @ ["map-1","key-4","inner-key"] val@ . cr
-		map @ ["map-1","key-4","inner-key",1] val@ . cr
-		map @ ["map-1","key-5","inner-key","inner-key-1"] val@ . cr
-		map @ ["map-1","key-5","inner-key","inner-key-1",1] val@ . cr
-		
-		"Indexed Map/Array access" . cr
-		map @ ["map-2","key-1",1] ["map-2","key-1",0] idx_val@ . cr
-		map @ ["map-2","key-2",2] ["map-2","key-2",0] idx_val@ . cr
-		map @ ["map-2","key-3","inner-key",1] ["map-2","key-3","inner-key",0] idx_val@ . cr
-		map @ ["map-2","key-4",1,"inner-key-1"] ["map-2","key-4",0] idx_val@ . cr
-	;
-
-	\ =========================================================================
-	\ Setter examples
-	: setter_examples
-		"Array setters" . cr
-		array @ [0] 1 "updated" val!
-		array @ [1,1] 1 "updated" val!
-		array @ . cr
-		
-		"Map/Array setters" . cr
-		map @ ["map-1","key-1"] 0 "updated" val!
-		map @ ["map-1","key-4"] "inner-key-1" [1,2,3,4] val!
-		map @ ["map-1","key-4"] "inner-key" [5,6,7,8] val!
-		map @ . cr
-	;
-
-	: run_test
-		"Run: " . . cr
-		getter_examples
-		setter_examples
-		0.1 sleep
-	;
-
-	: run_tests
-		' run_test 1 1 loop
-	;
-	
-	run_tests
-	
-	"Test complete" log
-	bye
-#then
