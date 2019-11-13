@@ -358,7 +358,7 @@ ns: fr.gs
 	const
 	\ Get task for name and lock task-dict
 	swap __gs_lock@ 
-	swap m:@ nip
+	swap m:@ nip null? if r@ "Task %s not registered!!" s:strfmt log __gs_unlock drop ;; then
 	\ Check message destination
 	dup rot  \ task data
 	\ Check if we running a GUI app
