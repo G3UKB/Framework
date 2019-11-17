@@ -402,6 +402,21 @@ ns: fr.gs
 		then
 	then
 ;
+\ As msg@ but drain all messages
+: msgrpt@	SED: -- *
+	\ Drain all messages
+	repeat
+		t:qlen 0 n:> if 
+			t:pop null? not if
+				\ We have work
+				\ Just send the data part of the message
+				"data" m:@ 0 a:@ nip swap "cb" m:@ nip w:exec
+			then
+		else
+			break
+		then
+	again
+;
 \ As msg@ but return whole message
 : msg@@	SED: -- *
 	\ Check for a message
