@@ -87,7 +87,8 @@
  whether messaging is direct through the gen-server or through the pub/sub system which dispatches through gen-server.
  However, the pub-sub system should be used for all communication unless there is a reason for not doing so. 
  
- \ non-GUI interactions
+ Non-GUI interactions
+ ====================
  1. Sender : gen-server, receiver : gen-server. 
  		This is the simplest scenario as everything is managed by the gen-server. Messages are sent using msg!. If a response
  		task and word is included in the message then the response is automatically sent to the task using response!. Do not use msg!
@@ -100,17 +101,18 @@
  		on a regular basis. There is no return value from the call, either the receiver word is called if there is a message or
  		nothing happens. If a response is required then the receiver can simply use msg! and the sender will automatically get the response.
  3. Sender : normal user task, receiver gen-server.
- 		This is similar to [2]. The sender uses msg! As in [2] the receiver does not automatically get the message, it must use msg@ or 
- 		msg@@. If a response is required then sender must call response@ as it will not automatically get the response. The usual place
- 		top do that is immediately after msg!. Pre-requirements if it wants a response it must be registered and the user task must set
- 		its task name with t:name! else +sender will get the default name and registry lookup will fail.
- 4.	Sender : gen-server, receiver : REPL,MAIN-TASK task.
+ 		This is similar to [2]. The sender uses msg! The receiver will automatically get the message. If a response is required then 
+ 		sender must call response@ as it will not automatically get the response. The usual place to do that is immediately after msg!. 
+ 		Pre-requirements if it wants a response it must be registered and the user task must set its task name with t:name! else +sender 
+ 		will get the default name and registry lookup will fail.
+ 4.	Sender : gen-server, receiver : REPL,MAIN-TASK
  		This is similar to [2] above except the main task is the recipient. As this is not a GUI task the message is dispatched as normal to
  		the task q and therefore must be retrieved with msg@ or msg@@.
- 5. Sender : REPL,MAIN-TASK task, receiver : gen-server.
-	 	Again similar to [3] above. The task uses msg! to send and if it wants to receive a reply it can use response@ to pick up the reply as
+ 5. Sender : REPL,MAIN-TASK, receiver : gen-server.
+	 	Again similar to [2] above. The task uses msg! to send and if it wants to receive a reply it can use response@ to pick up the reply as
  		its not a gen-server.
- \ GUI interactions
+ GUI interactions
+ ================
  6.	Sender : gen-server, receiver : GUI task.
   	This is similar to [2] above with the exception that the message is dispatched using g:do rather than to the message q. The message q 
   	and all synchronisation methods are inoperable in a GUI app. If the receiver wants to get a reply it can be sent by response! and will 
@@ -300,7 +302,7 @@ ns: fr.gs
 ;
 
 \ ----------------------------------
-\ Register an external task
+\ Get external task registration
 : reg@	SED: s -- t
 	__gs_reg@ 
 ;
@@ -312,7 +314,7 @@ ns: fr.gs
 ;
 
 \ ----------------------------------
-\ Remove an external task
+\ Remove an external task registration
 : reg_rm	SED: s -- t
 	__gs_reg_rm 
 ;
@@ -338,7 +340,7 @@ ns: fr.gs
 
 \ ========================================
 \ Message management
-\ task-name task-name-to-check
+\ task-name task-name-to-check -- flag
 : cmp_task	SED: s s -- T
 	over s:= if true else false then
 ;
@@ -361,7 +363,7 @@ ns: fr.gs
 	swap m:@ nip null? if r@ "Task %s not registered!!" s:strfmt log __gs_unlock drop ;; then
 	\ Check message destination
 	dup rot  \ task data
-	\ Check if we running a GUI app
+	\ Check if we are running a GUI app
 	app:isgui @ if
 		\ Yes, so check the target
 		r> ["REPL" , "GUI", "MainTask" ] ' cmp_task a:filter nip a:len nip 0 n:> if 
@@ -390,9 +392,11 @@ ns: fr.gs
 ;
 
 \ ----------------------------------
-\ Pull and execute from a task q else do nothing
+\ Pull and execute from a task q and dispatch to nominated word
+\ else do nothing. Send only data content.
 \ Useful for non gen-server tasks which use pub/sub
-: msg@	SED: -- *
+\ -- 
+: msg@	SED: -- 
 	\ Check for a message
 	t:qlen 0 n:> if 
 		t:pop null? not if
@@ -403,7 +407,8 @@ ns: fr.gs
 	then
 ;
 \ As msg@ but drain all messages
-: msgrpt@	SED: -- *
+\ --
+: msgrpt@	SED: -- 
 	\ Drain all messages
 	repeat
 		t:qlen 0 n:> if 
@@ -418,7 +423,8 @@ ns: fr.gs
 	again
 ;
 \ As msg@ but return whole message
-: msg@@	SED: -- *
+\ --
+: msg@@	SED: -- 
 	\ Check for a message
 	t:qlen 0 n:> if 
 		t:pop null? not if
@@ -451,8 +457,11 @@ ns: fr.gs
 ;
 
 \ ----------------------------------
+\ Transient responder task
+: __responder	SED: s w * -- 
+	msg! 
+;
 \ Push response data to sender
-: __responder msg! ;
 : response!	SED: s w * --
 	\ in:		* - opaque data to send 	
 	\				w - word to invoke in task

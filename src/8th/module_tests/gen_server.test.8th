@@ -51,9 +51,9 @@ with: harness
 \ The functional tests execute each scenario as given in the docs intro in gen-server.8th.
 \ Words called by messaging system
 \ Change for GUI tests
-false var, gen_server_test_normal
+true var, gen_server_test_normal
 false var, gen_server_test_gui_1
-true var, gen_server_test_gui_2
+false var, gen_server_test_gui_2
 
 gen_server_test_normal @ #if
 	\ ========================================
@@ -83,7 +83,7 @@ gen_server_test_normal @ #if
 		"GS-2" ' s1_gs2_receive ["Hi from GS-1"] ' s1_gs1_response +sender msg!
 	;	
 	: scenario-1
-		"*********Scenario 1 *********" log
+		cr "*********Scenario 1 *********" log
 		\ Create two gen-servers
 		\ Note that we get nothing back, simply use the name to communicate
 		\ Also as this is not a GUI task yet we can create these on the main thread
@@ -145,7 +145,7 @@ gen_server_test_normal @ #if
 		"T-1" ' s2_task_receive ["Hi from GS-1"] ' s2_gs1_response +sender msg!
 	;	
 	: scenario-2
-		"*********Scenario 2 *********" log
+		cr "*********Scenario 2 *********" log
 		\ Create one gen-server and one task
 		\ Note that we get nothing back, simply use the name to communicate
 		\ Also as this is not a GUI task yet we can create this on the main thread
@@ -211,7 +211,7 @@ gen_server_test_normal @ #if
 		"GS-1" ' s3_gs1_receive ["Hi from T-1"] ' s3_task_response +sender msg! response@
 	;	
 	: scenario-3
-		"*********Scenario 3 *********" log
+		cr "*********Scenario 3 *********" log
 		\ Create one gen-server and one task
 		\ Note that we get nothing back, simply use the name to communicate
 		\ Also as this is not a GUI task yet we can create this on the main thread
@@ -275,7 +275,7 @@ gen_server_test_normal @ #if
 	;
 
 	: scenario-4
-		"*********Scenario 4 *********" log
+		cr "*********Scenario 4 *********" log
 		\ Create user task and register it
 		' s4_task t:task "T-1" reg!
 		\ Register the main task so we can communicate
@@ -306,7 +306,7 @@ gen_server_test_normal @ #if
 		true "main" t:!
 	;
 	: scenario-5
-		"*********Scenario 5 *********" log
+		cr "*********Scenario 5 *********" log
 		\ Make the gen-server
 		"GS-1" gen_server_new
 		\ Register the main task so we can communicate
@@ -338,7 +338,7 @@ gen_server_test_normal @ #if
 		1 sleep
 		scenario-5
 		1 sleep
-		"********* Test Complete *********" log
+		cr "********* Test Complete *********" log
 		1 sleep
 		bye
 	;
@@ -367,10 +367,10 @@ gen_server_test_gui_1 @ #if
 	: s6_gen_server
 		t:name@ "%s received message %s" s:strfmt log
 		\ Message MAIN-TASK
-		"MAIN-TASK" ' s6_main_receive ["Hi from GS-1"] msg!
+		"MainTask" ' s6_main_receive ["Hi from GS-1"] msg!
 		\ Now one that requirs a reply
 		\ Here the message array is augmented with a task name and word to respond to.
-		"MAIN-TASK" ' s6_main_receive ["Hi from GS-1"] ' s6_gs1_response +sender msg!
+		"MainTask" ' s6_main_receive ["Hi from GS-1"] ' s6_gs1_response +sender msg!
 	;
 	\ We have to create gen-servers in a task for a GUI app.
 	: s6_task
@@ -388,20 +388,20 @@ gen_server_test_gui_1 @ #if
 	;
 	
 	: scenario-6
-		"*********Scenario 6 *********" log
+		cr "*********Scenario 6 *********" log
 		\ Create user task and register it
 		' s6_task t:task "T-1" reg!
 		\ Register the main task so we can communicate
-		t:curtask "MAIN-TASK" dup t:name! reg!
+		t:curtask "MainTask" dup t:name! reg!
 		\ Create a window so we can exit the test
 		harness_basic_window
 	;
 	\ ========================================
 	
-		true app:isgui !
-		: app:main
-			scenario-6
-			"app:main exiting" log
+	true app:isgui !
+	: app:main
+		scenario-6
+		"app:main exiting" log
 	;
 #then
 
@@ -427,10 +427,10 @@ gen_server_test_gui_2 @ #if
 	: s7_gen_server
 		t:name@ "%s received message %s" s:strfmt log
 		\ Message MAIN-TASK
-		"MAIN-TASK" ' s7_main_receive ["Hi from GS-1"] msg!
+		"MainTask" ' s7_main_receive ["Hi from GS-1"] msg!
 		\ Now one that requirs a reply
 		\ Here the message array is augmented with a task name and word to respond to.
-		"MAIN-TASK" ' s7_main_receive ["Hi from GS-1"] ' s7_gs1_response +sender msg!
+		"MainTask" ' s7_main_receive ["Hi from GS-1"] ' s7_gs1_response +sender msg!
 	;
 	\ We have to create gen-servers in a task for a GUI app.
 	: s7_task
@@ -448,11 +448,11 @@ gen_server_test_gui_2 @ #if
 	;
 
 	: scenario-7
-		"*********Scenario 7 *********" log
+		cr "*********Scenario 7 *********" log
 		\ Create user task and register it
 		' s7_task t:task "T-1" reg!
 		\ Register the main task so we can communicate
-		t:curtask "MAIN-TASK" dup t:name! reg!
+		t:curtask "MainTask" dup t:name! reg!
 		\ Create a window so we can exit the test
 		harness_basic_window
 		1 sleep
