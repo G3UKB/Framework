@@ -156,30 +156,34 @@ with: fr.gs
 
 \ ========================================
 \ Indirect publish
-\ Called by the gen-server to complete the publish
+
+\ ----------------------------------
+\ Runs on the PUB-SUB-TASK thread
 : __publish SED: a --
+	\ Now call the real publish
 	a:open publish
 ;
 
-\ Publish via the gen-server task
+\ ----------------------------------
+\ Publish via the PUB-SUB-TASK
 : publish!	SED: * s --	
-	2 a:close "PUB-SUB-TASK" ' __publish rot msg!
+	\ Message PUB-SUB-TASK
+	2 a:close PUB-SUB-TASK ' __publish rot msg!
 ;
 
 \ ----------------------------------
+\ We create a gen-server to use to publish when we cannot do so directly.
+\ This occurs e.g. when we are in a GUI callback and we want to publish something
+\ that could call back into the GUI task. This would lock the event loop if it was done
+\ on the GUI thread.
 : pubsub_init	SED: --
-	\ We create a gen-server to use to publish when we cannot do so directly.
-	\ This occurs e.g. when we are in a GUI callback and we want to publish something
-	\ that could call back into the GUI task. This would lock the event loop.
-	"PUB-SUB-TASK" gen_server_new
+	PUB-SUB-TASK gen_server_new
 ;
 
 \ ----------------------------------
+\ Terminate the indirect PUB-SUB-TASK
 : pubsub_term	SED: --
-	\ We create a gen-server to use to publish when we cannot doso directly
-	\ This occurs e.g. when we are in a GUI callback and we want to publish something
-	\ that could call back into the GUI task which would not be allowed.
-	"PUB-SUB-TASK" gen_server_term
+	PUB-SUB-TASK gen_server_term
 ;
 
 \ ========================================

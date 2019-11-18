@@ -25,8 +25,8 @@
 \ ========================================
 \ Includes
 "../gen_server.8th" f:include
-"../pub_sub.8th" f:include
 "E:/Projects/SDRLibEConsole/trunk/src/8th/common/app_defs.8th" f:include
+"../pub_sub.8th" f:include
 "E:/Projects/SDRLibEConsole/trunk/src/8th/common/radio_defs.8th" f:include
 "E:/Projects/SDRLibEConsole/trunk/src/8th/common/ps_events.8th" f:include
 "E:/Projects/SDRLibEConsole/trunk/src/8th/connector/connector.8th" f:include
@@ -49,7 +49,7 @@ with: harness
 4 json-pretty
 
 (*
-	This is a layer ontop on gen-server and therefore has the same set of rules that
+	This is a layer on top of gen-server and therefore has the same set of rules that
 	apply to direct communication via gen-server and its associated words.
 
 	We test this by creating the set of possible sources and sinks and then create a 
@@ -64,6 +64,7 @@ with: harness
 	5. Publish TOPIC-2 from UT-1.
 	6. Publish TOPIC-3 from GS-1. 
 	7. From a GUI button click publish! TOPIC-1, 2 and 3.
+	Note the button event is received back at the GUI using publish!
 *)
 
 \ ========================================
@@ -179,14 +180,14 @@ with: harness
 	\ Create user task and register it
 	' startup_task t:task "STARTUP" reg!
 	\ Register the main task so we can communicate
-	t:curtask "MAIN-TASK" dup t:name! reg!
+	t:curtask "MainTask" dup t:name! reg!
 	\ Create a window with one button
 	harness_button_window
 	1 sleep
 	\ Do GUI task subscriptions
-	"MAIN-TASK" ' gui_subs_1 "TOPIC-1" subscribe
-	"MAIN-TASK" ' gui_subs_2 "TOPIC-2" subscribe
-	"MAIN-TASK" ' gui_subs_3 "TOPIC-3" subscribe
+	"MainTask" ' gui_subs_1 "TOPIC-1" subscribe
+	"MainTask" ' gui_subs_2 "TOPIC-2" subscribe
+	"MainTask" ' gui_subs_3 "TOPIC-3" subscribe
 	\ Set closedown
 	' terminate onexit
 ;
