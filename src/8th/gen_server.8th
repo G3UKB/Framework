@@ -355,7 +355,7 @@ ns: fr.gs
 	\ out:	none
 	\ Word to invoke under the "cb" key and data under the "data" key
 	\ The data is cloned before the send as it must be detached from the current task pool
-	"1" . cr 2 pick >r
+	2 pick >r
 	m:new "cb" 3 pick m:! "data" 2 pick m:! nip nip
 	\ Clone the whole message structure and push to the task q
 	const
