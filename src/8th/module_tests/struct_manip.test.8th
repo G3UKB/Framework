@@ -23,15 +23,15 @@
  *)
  
 \ ========================================
-\ Includes
-"../struct_manip.8th" f:include
-
-\ ========================================
 \ Debug Settings
 \ needs debug/sed
 \ true SED-CHECK
 \ needs debug/trace
 \ dbg:line-info
+
+\ ========================================
+\ Includes
+"../struct_manip.8th" f:include
 
 \ ========================================
 \ Test code

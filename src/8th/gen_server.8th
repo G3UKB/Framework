@@ -223,7 +223,7 @@ ns: fr.gs
 
 \ ----------------------------------
 \ Process 1 item from task Q	
-: __gs_proc_q	SED: --
+: __gs_proc_q SED: --
 	t:qlen 0 n:= if
 		"Warning gen-server queue was empty when processing [" t:name@ s:+ "]!" s:+ log 
 	else 
@@ -233,11 +233,12 @@ ns: fr.gs
 			\ Message to process, just send data part
 			"data" m:@ swap "cb" m:@ nip w:exec
 		then
-	then ;
+	then 
+;
 	
 \ ----------------------------------
 \ Task entry point for all generic servers
-: __gen_server	 SED: s t -- 
+: __gen_server SED: s t -- 
 	\ in: 	0 t: calling task
 	\				1 s: this task name
 	\ out:	none
@@ -340,21 +341,21 @@ ns: fr.gs
 
 \ ========================================
 \ Message management
-\ task-name task-name-to-check -- flag
-: cmp_task	SED: s s -- T
+\ task-name task-name-to-check -- task-name flag
+: cmp_task	SED: s s -- s T
 	over s:= if true else false then
 ;
 
 \ ----------------------------------
 \ Message send to a given word on a given task name queue
-: msg!	SED: s w * --
+: msg! SED: s w * --
 	\ in:		* - opaque data to send 	
 	\				w - word to invoke in task
 	\				s - task name
 	\ out:	none
 	\ Word to invoke under the "cb" key and data under the "data" key
 	\ The data is cloned before the send as it must be detached from the current task pool
-	2 pick >r
+	"1" . cr 2 pick >r
 	m:new "cb" 3 pick m:! "data" 2 pick m:! nip nip
 	\ Clone the whole message structure and push to the task q
 	const
@@ -424,7 +425,7 @@ ns: fr.gs
 ;
 \ As msg@ but return whole message
 \ --
-: msg@@	SED: -- 
+: msg@@	\ SED: -- 
 	\ Check for a message
 	t:qlen 0 n:> if 
 		t:pop null? not if
@@ -473,14 +474,16 @@ ns: fr.gs
 
 \ ----------------------------------
 \ Chck for response data
-\ response-array -- task-name word flag
-: is_response? SED: a -- s w T
+\ response-array -- flag | task-name word flag
+: is_response?  SED: a -- T | s w T
 	a:len 3 n:= if
 		a:open null? if
 			false
 		else
 			true
 		then
+	else
+		false
 	then
 ;
 

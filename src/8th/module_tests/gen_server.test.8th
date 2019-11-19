@@ -23,21 +23,21 @@
  *)
  
 \ ========================================
-\ Includes
-"../gen_server.8th" f:include
-"../pub_sub.8th" f:include
-"E:/Projects/SDRLibEConsole/trunk/src/8th/common/app_defs.8th" f:include
-"E:/Projects/SDRLibEConsole/trunk/src/8th/common/radio_defs.8th" f:include
-"E:/Projects/SDRLibEConsole/trunk/src/8th/common/ps_events.8th" f:include
-"E:/Projects/SDRLibEConsole/trunk/src/8th/connector/connector.8th" f:include
-"E:/Projects/SDRLibEConsole/trunk/src/8th/harness/harness.8th" f:include
-
-\ ========================================
 \ Debug Settings
 \ needs debug/sed
 \ true SED-CHECK
 \ needs debug/trace
 \ dbg:line-info
+
+\ ========================================
+\ Includes
+"E:/Projects/SDRLibEConsole/trunk/src/8th/common/app_defs.8th" f:include
+"../gen_server.8th" f:include
+"../pub_sub.8th" f:include
+"E:/Projects/SDRLibEConsole/trunk/src/8th/common/radio_defs.8th" f:include
+"E:/Projects/SDRLibEConsole/trunk/src/8th/common/ps_events.8th" f:include
+"E:/Projects/SDRLibEConsole/trunk/src/8th/connector/connector.8th" f:include
+"E:/Projects/SDRLibEConsole/trunk/src/8th/harness/harness.8th" f:include
 
 \ ========================================
 \ Test code

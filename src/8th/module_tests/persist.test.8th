@@ -21,10 +21,6 @@
   The author can be reached by email at:   
      bob@bobcowdery.plus.com
  *)
- 
-\ ========================================
-\ Includes
-"../persist.8th" f:include
 
 \ ========================================
 \ Debug Settings
@@ -32,6 +28,10 @@
 \ true SED-CHECK
 \ needs debug/trace
 \ dbg:line-info
+
+\ ========================================
+\ Includes
+"../persist.8th" f:include
 
 \ ========================================
 \ Test code

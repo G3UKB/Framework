@@ -30,13 +30,13 @@
 	
 	PUBLIC INTERFACE:
 	
-	Get the value of the element on the path given by a from the arbitrary structure *.
+	Get the value of the element on the path given by an array from the arbitrary structure *.
 	val@	SED: * a -- *
 	
-	Get the value of the element on the path given by a at index given by a from the arbitrary structure *.
+	Get the value of the element on the path given by an array  at index given by a from the arbitrary structure *.
 	idx_val@	SED: * a a -- *
 	
-	Set or Create the value given by the path a in the structure * with the value * at the index or key *.
+	Set or Create the value given by the path in an array in the structure * with the value * at the index or key *.
 	val!	SED: * a * * -- 
 	
 *)
@@ -55,12 +55,14 @@ ns: fr.sm
 \ ========================================
 \ Check for sensible stack for array and map access words.
 \ Throw an exception if it looks wrong with all info we can obtain.
-\ Not implemented at present.
+\ Not implemented at present but add code here if m* or a* type
+\ exceptions are being thrown.
 
-: __a@	SED:  a n --  		
+: __a@	SED:  a n -- a *		
 	\	in:		n - index
 	\				a - target array
 	\ out:	a - indexed item
+	\				a - target array
 	a:@
 ;
 
@@ -80,11 +82,11 @@ ns: fr.sm
 	m:@
 ;
 
-: __m!	SED:  m s * -- 
+: __m!	SED:  m s * -- m
 	\ in:		* - item to store at kay in map 		
 	\				s - key
 	\				m - target map
-	\ out:	a - modified array
+	\ out:	a - modified map
 	m:!
 ;
 
