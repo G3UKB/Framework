@@ -365,7 +365,7 @@ ns: fr.gs
 	\ Check message destination
 	dup rot  \ task data
 	\ Check if we are running a GUI app
-	app:isgui @ if
+	app:isgui
 		\ Yes, so check the target
 		r> ["REPL" , "GUI", "MainTask" ] ' cmp_task a:filter nip a:len nip 0 n:> if 
 			\ The destination is a main-task so we must use g:do

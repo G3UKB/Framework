@@ -62,7 +62,7 @@ ns: fr.p
 		then
 	else
 		\ Try and create the file
-		dup f:create f:close 
+		dup f:create f:close
 	then
 	\ No file or bad json data
 	\ Save the default model and return it as the current model
