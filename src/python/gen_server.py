@@ -23,8 +23,6 @@
 #     bob@bobcowdery.plus.com
 #
 
-# Application imports
-
 """
     This module is loosly based on the erlang gen-server in that it emulates a 
     process oriented message passing concurrency model.
@@ -54,7 +52,7 @@
         message loop is executing so messages are not automatically dispatched. Calling gen_server_msg_get() on a periodic basis will cause
         any queued messages to be dispatched to the 'callable' for the calling task (as registered).
         
-            gen_server_msg_get( [*, optional sender, option callable] )
+            [*, optional sender, option callable] = gen_server_msg_get()
 
         When the callable receives a message from gen_server_msg() by whatever route it must be aware of the structure of the opaque data
         and if a response is required the array must include the sender name and word to call. In order to respond it should call
@@ -64,7 +62,7 @@
   
         Retrieves responses for tasks that are not gen-servers. For the same reason as messages these are not dispatched automatically.
         
-            gen_server_response_get( * )
+            * = gen_server_response_get()
         
         If a task which is not a gen-server wishes to participate in the messaging framework it must be registered in the task registry
         with 'task' the task reference and 'name' the task name.
@@ -112,3 +110,72 @@
             gen_server_response_get() to pick up the reply.
                 
 """
+
+# Application imports
+import threading
+
+# ====================================================================
+# PRIVATE
+# Task dictionary
+# This will be accessed from multiple threads
+#
+__gen_server_td = {}
+
+# Task dict lock
+__lock = threading.Lock
+
+def __gen_server_lock():
+    __lock.acquire()
+    
+def __gen_server_release():
+    __lock.release()
+    
+def __gen_server_store_task_ref( name, ref ):
+    __gen_server_lock()
+    __gen_server_td = [name, ref]
+    __gen_server_release()
+
+def __gen_server_get_task_ref( name ):
+    __gen_server_lock()
+    if name in  __gen_server_td:
+        return __gen_server_td[name]
+    else:
+        return None
+    __gen_server_release()
+    
+def __gen_server_rm_task_ref( name ):
+    __gen_server_lock()
+    if name in  __gen_server_td:
+        del __gen_server_td[name]
+    __gen_server_release()
+
+# ====================================================================
+# PUBLIC
+# API
+
+def __gen_server_new( name ):
+    pass
+
+def gen_server_term( name ):
+    pass
+
+def gen_server_term_all( ):
+    pass
+
+def gen_server_msg( name, msg_callback, message ):
+    pass
+
+def gen_server_msg_get( message ):
+    return []
+
+def gen_server_response(name, resp_callback, response):
+    pass
+
+def gen_server_response_get():
+    pass
+
+def gen_server_reg( task, name ):
+    pass
+
+def gen_server_reg_rm( name ):
+    pass
