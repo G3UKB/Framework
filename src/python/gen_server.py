@@ -132,7 +132,7 @@ def __gen_server_release():
     
 def __gen_server_store_task_ref( name, ref ):
     __gen_server_lock()
-    __gen_server_td = [name, ref]
+    __gen_server_td = [name] = ref
     __gen_server_release()
 
 def __gen_server_get_task_ref( name ):
@@ -179,3 +179,16 @@ def gen_server_reg( task, name ):
 
 def gen_server_reg_rm( name ):
     pass
+
+# ====================================================================
+# PRIVATE
+# The gen-server task
+
+class GenServer(threading.Thread):
+    
+    def __init(self):
+        pass
+    
+    def run(self):
+        pass
+    
