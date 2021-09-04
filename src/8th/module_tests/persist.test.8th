@@ -37,7 +37,7 @@
 \ Test code
 with: fr.p
 
-4 json-pretty
+10 json-pretty
 
 	: run_test
 		cr cr "Run test: " swap >s s:+ log	
