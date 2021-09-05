@@ -163,48 +163,72 @@ def __gen_server_rm_task_ref( name ):
 # PUBLIC
 # API
 
-def __gen_server_new( name ):
+def gen_server_new( name, dispatcher ):
     
     # Assign a queue
     q = queue.Queue()
     # Create a new gen-server
-    g_s = GenServer(name, q)
+    g_s = GenServer(name, dispatcher, q)
     # Add to the task registry
-    __gen_server_store_task_ref(name, [g_s, q])
+    __gen_server_store_task_ref(name, [g_s, dispatcher, q])
     # Start the gen-server loop
     g_s.start()
     
 def gen_server_term( name ):
      item = __gen_server_get_task_ref(name)
      if item != None:
-        ref, q = item
+        ref, d, q = item
         ref.terminate()
         ref,join()
         
 def gen_server_term_all( ):
     items = __gen_server_get_all_ref()
     for item in items:
-        ref, q = item
+        ref, d, q = item
         ref.terminate()
         ref,join()
 
-def gen_server_msg( name, msg_callback, message ):
-    pass
+def gen_server_msg( name, message ):
+    item = __gen_server_get_task_ref(name)
+    if item != None:
+        msg = [name, message]
+        gen_server, d, q = item
+        q.put(msg)
 
-def gen_server_msg_get( message ):
-    return []
-
+def gen_server_msg_get(name):
+    item = __gen_server_get_task_ref(name)
+    if item != None:
+        gen_server, d, q = item
+        try:
+            msg = q.get(block=True, timeout=0.1)
+            return msg
+        except Queue.Empty:
+            return None
+        
 def gen_server_response(name, resp_callback, response):
-    pass
+    item = __gen_server_get_task_ref(name)
+    if item != None:
+        msg = [name, resp_callback, response]
+        gen_server, d, q = item
+        q.put(msg)
 
-def gen_server_response_get():
-    pass
+def gen_server_response_get(name):
+    item = __gen_server_get_task_ref(name)
+    if item != None:
+        gen_server, d, q = item
+        try:
+            msg = q.get(block=True, timeout=0.1)
+            return msg
+        except Queue.Empty:
+            return None
 
-def gen_server_reg( task, name ):
-    pass
+def gen_server_reg( name, task, dispatcher, q ):
+    # Add to the task registry
+    __gen_server_store_task_ref(name, [task, dispatcher, q])
 
 def gen_server_reg_rm( name ):
-    pass
+    # Remove from task registry
+    __gen_server_rm_task_ref( name )
 
 # ====================================================================
 # PRIVATE
@@ -212,8 +236,9 @@ def gen_server_reg_rm( name ):
 
 class GenServer(threading.Thread):
     
-    def __init(self, name, q):
+    def __init(self, name, dispatcher, q):
         self.__name = name
+        self.__dispatcher = dispatcher
         self.__q = q
         self.__term = False
         
@@ -233,15 +258,29 @@ class GenServer(threading.Thread):
     def __process(self, msg):
         # A message is of this form
         # [name, callable, [*, optional sender, option callable]]
-        name, callable, data = item
+        name, data = item
         # Lookup the destination
         item = __gen_server_get_task_ref(name)
-        if ref == None:
+        if item == None:
             # Oops, no destination
             print("GenServer - destination %s not found!" % (name))
         else:
-            # Dispatch to destination
-            callable(data)
+            # Dispatch
+            gen_server, d, q = item
+            d(data)
             
                 
     
+# ====================================================================
+# PUBLIC
+# Test code
+
+def main():
+    # Make 2 gen-servers
+    gen_server_new("A")
+    gen_server_new("B")
+    # Send message from A to B
+    gen_server_msg( name, msg_callback, message )
+    
+if __name__ == '__main__':
+    main()
