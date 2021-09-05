@@ -113,12 +113,14 @@
 
 # Application imports
 import threading
+import queue
 
 # ====================================================================
 # PRIVATE
 # Task dictionary
 # This will be accessed from multiple threads
 #
+# Holds refs in the form name: [gen-server, queue]
 __gen_server_td = {}
 
 # Task dict lock
@@ -142,6 +144,14 @@ def __gen_server_get_task_ref( name ):
     else:
         return None
     __gen_server_release()
+
+def __gen_server_get_all_ref():
+    __gen_server_lock()
+    refs = []
+    for ref in  __gen_server_td:
+        refs.append(ref)
+    __gen_server_release()
+    return refs
     
 def __gen_server_rm_task_ref( name ):
     __gen_server_lock()
@@ -154,13 +164,29 @@ def __gen_server_rm_task_ref( name ):
 # API
 
 def __gen_server_new( name ):
-    pass
-
+    
+    # Assign a queue
+    q = queue.Queue()
+    # Create a new gen-server
+    g_s = GenServer(name, q)
+    # Add to the task registry
+    __gen_server_store_task_ref(name, [g_s, q])
+    # Start the gen-server loop
+    g_s.start()
+    
 def gen_server_term( name ):
-    pass
-
+     item = __gen_server_get_task_ref(name)
+     if item != None:
+        ref, q = item
+        ref.terminate()
+        ref,join()
+        
 def gen_server_term_all( ):
-    pass
+    items = __gen_server_get_all_ref()
+    for item in items:
+        ref, q = item
+        ref.terminate()
+        ref,join()
 
 def gen_server_msg( name, msg_callback, message ):
     pass
@@ -186,9 +212,36 @@ def gen_server_reg_rm( name ):
 
 class GenServer(threading.Thread):
     
-    def __init(self):
-        pass
-    
+    def __init(self, name, q):
+        self.__name = name
+        self.__q = q
+        self.__term = False
+        
+    def term(self):
+        self.__term = True
+        
     def run(self):
-        pass
+        while not self.__term:
+            try:
+                item = self.__q.get(block=True, timeout=1)
+                # Process message
+                __process(item)
+            except Queue.Empty
+                continue
+        print("GenServer %s terminating...", % (self.__name))
+            
+    def __process(self, msg):
+        # A message is of this form
+        # [name, callable, [*, optional sender, option callable]]
+        name, callable, data = item
+        # Lookup the destination
+        item = __gen_server_get_task_ref(name)
+        if ref == None:
+            # Oops, no destination
+            print("GenServer - destination %s not found!" % (name))
+        else:
+            # Dispatch to destination
+            callable(data)
+            
+                
     
