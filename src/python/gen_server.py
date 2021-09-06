@@ -177,16 +177,18 @@ def gen_server_new( name, dispatcher ):
 def gen_server_term( name ):
      item = gen_server_get_task_ref(name)
      if item != None:
-        ref, d, q = item
-        ref.terminate()
-        ref,join()
+        name, ref = item
+        if ref[0] != None:
+            ref[0].terminate()
+            ref[0].join()
         
 def gen_server_term_all( ):
     items = __gen_server_get_all_ref()
     for item in items:
         name, ref = item
-        ref[0].terminate()
-        ref[0].join()
+        if ref[0] != None:
+            ref[0].terminate()
+            ref[0].join()
 
 def gen_server_msg( name, message ):
     item = gen_server_get_task_ref(name)
@@ -205,10 +207,10 @@ def gen_server_msg_get(name):
         except queue.Empty:
             return None
         
-def gen_server_response(name, resp_callback, response):
+def gen_server_response(name, response):
     item = gen_server_get_task_ref(name)
     if item != None:
-        msg = [name, resp_callback, response]
+        msg = [name, response]
         gen_server, d, q = item
         q.put(msg)
 
@@ -257,9 +259,8 @@ class GenServer(threading.Thread):
         print("GenServer %s terminating..." % (self.__name))
             
     def __process(self, msg):
-        #print("Process ", msg)
-        # A message is of this form
-        # [name, callable, [*, optional sender, option callable]]
+        # A message is of this form but data is opaque to us
+        # [name, * | [*, sender]]
         name, data = msg
         # Lookup the destination
         item = gen_server_get_task_ref(name)
@@ -275,20 +276,54 @@ class GenServer(threading.Thread):
 # PUBLIC
 # Test code
 
+def main_dispatch(msg):
+    print("MAIN ", msg)
+
 def a_dispatch(msg):
-    print("Message to A ", msg)
+    print("A ", msg)
+    gen_server_msg( "MAIN", "Message to MAIN from A" )
+    # Does message need a response
+    if type(msg) is list:
+        sender, data = msg
+        gen_server_response( sender, "Response to %s from A" % (sender) )
 
 def b_dispatch(msg):
-    print("Message to B ", msg)
-
+    print("B ",msg)
+    gen_server_msg( "MAIN", "Message to MAIN from B" )
+    # Does message need a response
+    if type(msg) is list:
+        sender, data = msg
+        gen_server_response( sender, "Response to %s from B" % (sender) )
+    
 def main():
     # Make 2 gen-servers
     gen_server_new("A", a_dispatch)
     gen_server_new("B", b_dispatch)
-    sleep(1)
-    # Send message to A and B
+    
+    # Regiater main thread
+    q = queue.Queue()
+    gen_server_reg( "MAIN", None, main_dispatch, q )
+    
+    # Send message to A and B from main thread
     gen_server_msg( "A", "Message to A" )
     gen_server_msg( "B", "Message to B" )
+    
+    # Retrieve messages for us
+    msg = gen_server_msg_get("MAIN")
+    while msg != None:
+        print(msg)
+        msg = gen_server_msg_get("MAIN")
+    
+    # Send message to A and B from main thread that require a response
+    gen_server_msg( "A", ["MAIN", "Message to A expects response"] )
+    gen_server_msg( "B", ["MAIN", "Message to B expects response"] )
+    
+    # Retrieve responses for us
+    resp = gen_server_response_get("MAIN")
+    while resp != None:
+        print(resp)
+        resp = gen_server_response_get("MAIN")
+        
     # Terminate servers
     gen_server_term_all()
     
