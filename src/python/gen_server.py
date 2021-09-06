@@ -149,9 +149,7 @@ def gen_server_get_task_ref( name ):
 
 def __gen_server_get_all_ref():
     __gen_server_lock()
-    refs = []
-    for ref in  __gen_server_td:
-        refs.append(ref)
+    refs = __gen_server_td.items()
     __gen_server_release()
     return refs
     
@@ -185,22 +183,17 @@ def gen_server_term( name ):
         
 def gen_server_term_all( ):
     items = __gen_server_get_all_ref()
-    print(items)
     for item in items:
-        ref, d, q = item
-        ref.terminate()
-        ref,join()
+        name, ref = item
+        ref[0].terminate()
+        ref[0].join()
 
 def gen_server_msg( name, message ):
     item = gen_server_get_task_ref(name)
-    #print("Item ", item)
     if item != None:
         msg = [name, message]
-        #print("Msg ", msg)
         gen_server, d, q = item
-        #print("Unpacked ", gen_server, d, q)
         q.put(msg)
-        #print("Put")
 
 def gen_server_msg_get(name):
     item = gen_server_get_task_ref(name)
@@ -250,7 +243,7 @@ class GenServer(threading.Thread):
         self.__q = q
         self.__term = False
         
-    def term(self):
+    def terminate(self):
         self.__term = True
         
     def run(self):
@@ -268,21 +261,15 @@ class GenServer(threading.Thread):
         # A message is of this form
         # [name, callable, [*, optional sender, option callable]]
         name, data = msg
-        #print(name, data)
         # Lookup the destination
         item = gen_server_get_task_ref(name)
-        #print("Item ", item)
         if item == None:
             # Oops, no destination
             print("GenServer - destination %s not found!" % (name))
         else:
             # Dispatch
             gen_server, d, q = item
-            #print(gen_server, d, q)
-            d(data)
-            #print("Dispatched")
-            
-                
+            d(data)  
     
 # ====================================================================
 # PUBLIC
@@ -297,15 +284,11 @@ def b_dispatch(msg):
 def main():
     # Make 2 gen-servers
     gen_server_new("A", a_dispatch)
-    print("Created A")
     gen_server_new("B", b_dispatch)
-    print("Created B")
     sleep(1)
     # Send message to A and B
     gen_server_msg( "A", "Message to A" )
-    print("Message A")
     gen_server_msg( "B", "Message to B" )
-    print("Message B")
     # Terminate servers
     gen_server_term_all()
     
