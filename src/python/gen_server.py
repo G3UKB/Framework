@@ -114,6 +114,7 @@
 # Application imports
 import threading
 import queue
+from time import sleep
 
 # ====================================================================
 # PRIVATE
@@ -137,13 +138,14 @@ def __gen_server_store_task_ref( name, ref ):
     __gen_server_td[name] = ref
     __gen_server_release()
 
-def __gen_server_get_task_ref( name ):
+def gen_server_get_task_ref( name ):
     __gen_server_lock()
     if name in  __gen_server_td:
-        return __gen_server_td[name]
+        r = __gen_server_td[name]
     else:
-        return None
+        r = None
     __gen_server_release()
+    return r
 
 def __gen_server_get_all_ref():
     __gen_server_lock()
@@ -175,7 +177,7 @@ def gen_server_new( name, dispatcher ):
     g_s.start()
     
 def gen_server_term( name ):
-     item = __gen_server_get_task_ref(name)
+     item = gen_server_get_task_ref(name)
      if item != None:
         ref, d, q = item
         ref.terminate()
@@ -183,20 +185,25 @@ def gen_server_term( name ):
         
 def gen_server_term_all( ):
     items = __gen_server_get_all_ref()
+    print(items)
     for item in items:
         ref, d, q = item
         ref.terminate()
         ref,join()
 
 def gen_server_msg( name, message ):
-    item = __gen_server_get_task_ref(name)
+    item = gen_server_get_task_ref(name)
+    #print("Item ", item)
     if item != None:
         msg = [name, message]
+        #print("Msg ", msg)
         gen_server, d, q = item
+        #print("Unpacked ", gen_server, d, q)
         q.put(msg)
+        #print("Put")
 
 def gen_server_msg_get(name):
-    item = __gen_server_get_task_ref(name)
+    item = gen_server_get_task_ref(name)
     if item != None:
         gen_server, d, q = item
         try:
@@ -206,14 +213,14 @@ def gen_server_msg_get(name):
             return None
         
 def gen_server_response(name, resp_callback, response):
-    item = __gen_server_get_task_ref(name)
+    item = gen_server_get_task_ref(name)
     if item != None:
         msg = [name, resp_callback, response]
         gen_server, d, q = item
         q.put(msg)
 
 def gen_server_response_get(name):
-    item = __gen_server_get_task_ref(name)
+    item = gen_server_get_task_ref(name)
     if item != None:
         gen_server, d, q = item
         try:
@@ -257,18 +264,23 @@ class GenServer(threading.Thread):
         print("GenServer %s terminating..." % (self.__name))
             
     def __process(self, msg):
+        #print("Process ", msg)
         # A message is of this form
         # [name, callable, [*, optional sender, option callable]]
         name, data = msg
+        #print(name, data)
         # Lookup the destination
-        item = __gen_server_get_task_ref(name)
+        item = gen_server_get_task_ref(name)
+        #print("Item ", item)
         if item == None:
             # Oops, no destination
             print("GenServer - destination %s not found!" % (name))
         else:
             # Dispatch
             gen_server, d, q = item
+            #print(gen_server, d, q)
             d(data)
+            #print("Dispatched")
             
                 
     
@@ -285,10 +297,15 @@ def b_dispatch(msg):
 def main():
     # Make 2 gen-servers
     gen_server_new("A", a_dispatch)
+    print("Created A")
     gen_server_new("B", b_dispatch)
+    print("Created B")
+    sleep(1)
     # Send message to A and B
     gen_server_msg( "A", "Message to A" )
+    print("Message A")
     gen_server_msg( "B", "Message to B" )
+    print("Message B")
     # Terminate servers
     gen_server_term_all()
     
