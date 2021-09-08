@@ -30,9 +30,14 @@
 
     PUBLIC INTERFACE:
         Main words for gen-server and message management:
+        
+        NOTE: As this is intended to use the pattern matching introduced in 3.10 the messages must be sequences in order to
+        bind directly to variables in the match statements.
   
         Create a new gen-server with the task name 'name'. As everything is performed using the task name you should
-        never need to keep the reference. The dispatcher is a callable that will process the messages.
+        never need to keep the reference. The dispatcher is a callable that will process the messages. One special message is
+        "INIT" which is sent once the gen-server is running. This is effectively an extension of __init__() to allow any
+        initialisation processing to be done.
   
             gen_server_new( name, dispatcher )
 
@@ -50,13 +55,13 @@
         Retrieve message for tasks that are not gen-servers. Returns the full content. Such tasks could be the main thread or threads that
         want to communicate in other ways but also use the message infrastructure (see registration). As these tasks are not gen-servers no
         message loop is executing so messages are not automatically dispatched. Calling gen_server_msg_get() on a periodic basis will cause
-        any queued messages to be dispatched to the calling task (as registered).
+        any queued messages to be dispatched to the calling task.
         
             [*] | [sender, *] = gen_server_msg_get()
 
-        When the callable receives a message from gen_server_msg() by whatever route it must be aware of the structure of the opaque data
-        and if a response is required the array must include the sender name. In order to respond it should call
-        gen_server_response() with the sender name 'name', and * the opaque response data.
+        When the dispatcher receives a message from gen_server_msg() by whatever route it must be aware of the structure of the opaque data
+        and if a response is required the array must include the sender name. In order to respond it should call gen_server_response()
+        with the sender name 'name', and * the opaque response data.
   
             gen_server_response(name, *)
   
@@ -174,6 +179,8 @@ def gen_server_new( name, dispatcher ):
     __gen_server_store_task_ref(name, [g_s, dispatcher, q])
     # Start the gen-server loop
     g_s.start()
+    # Initialise task
+    dispatcher("INIT")
     
 def gen_server_term( name ):
      item = gen_server_get_task_ref(name)
@@ -253,6 +260,7 @@ class GenServer(threading.Thread):
         while not self.__term:
             try:
                 item = self.__q.get(block=True, timeout=1)
+                #print("***item ", item)
                 # Process message
                 self.__process(item)
             except queue.Empty:
@@ -284,7 +292,11 @@ class GenServer(threading.Thread):
 def main_dispatch(msg):
     match msg:
         case [data]:
-            print("MAIN [data] ", data)
+            match data:
+                case "Message 1 to MAIN":
+                    print("MAIN Message 1 ", data)
+                case "Message 2 to MAIN":
+                    print("MAIN Message 2 ", data)
         # Does message need a response
         case [sender, data]:
             print("MAIN [%s, %s] " % (sender, data))
@@ -294,25 +306,55 @@ def main_dispatch(msg):
 
 def a_dispatch(msg):
     match msg:
+        case "INIT":
+            print("INIT A")
         case [data]:
-            print("A [data] ", data)
-            gen_server_msg( "MAIN", "Message to MAIN from A" )
+            match data:
+                case "Message 1 to A":
+                    print("A Message 1 ", data)
+                    gen_server_msg( "MAIN", ["Message to MAIN from A[1]"] )
+                    gen_server_msg( "B", ["Message to B from A[1]"] )
+                case "Message 2 to A":
+                    print("A Message 2 ", data)
+                    gen_server_msg( "MAIN", ["Message to MAIN from A[2]"] )
+                    gen_server_msg( "B", ["Message to B from A[2]"] )
+                case "Message to A from B[1]":
+                    print("B-A [1]")
+                case "Message to A from B[2]":
+                    print("B-A [2]")
+                case _:
+                    print("A [unknown message %s]" % (msg))
         # Does message need a response
         case [sender, data]:
             print("A [%s, %s] " % (sender, data))
-            gen_server_response( sender, "Response to %s from A" % (sender) )
+            gen_server_response( sender, ["Response to %s from A" % (sender)] )
         case _:
             print("A [unknown message %s]" % (msg)) 
 
 def b_dispatch(msg):
     match msg:
+        case "INIT":
+            print("INIT B")
         case [data]:
-            print("B [data] ", data)
-            gen_server_msg( "MAIN", "Message to MAIN from B" )
+            match data:
+                case "Message 1 to B":
+                    print("B Message 1 ", data)
+                    gen_server_msg( "MAIN", ["Message to MAIN from B[1]"] )
+                    gen_server_msg( "A", ["Message to A from B[1]"] )
+                case "Message 2 to B":
+                    print("B Message 2 ", data)
+                    gen_server_msg( "MAIN", ["Message to MAIN from B[2]"] )
+                    gen_server_msg( "A", ["Message to A from B[2]"] )
+                case "Message to B from A[1]":
+                    print("A-B [1]")
+                case "Message to B from A[2]":
+                    print("A-B [2]")
+                case _:
+                    print("A [unknown message %s]" % (msg))
         # Does message need a response
         case [sender, data]:
             print("B [%s, %s] " % (sender, data))
-            gen_server_response( sender, "Response to %s from B" % (sender) )
+            gen_server_response( sender, ["Response to %s from B" % (sender)] )
         case _:
             print("B [unknown message %s]" % (msg))
     
@@ -326,8 +368,10 @@ def main():
     gen_server_reg( "MAIN", None, main_dispatch, q )
     
     # Send message to A and B from main thread
-    gen_server_msg( "A", ["Message to A"] )
-    gen_server_msg( "B", ["Message to B"] )
+    gen_server_msg( "A", ["Message 1 to A"] )
+    gen_server_msg( "B", ["Message 1 to B"] )
+    gen_server_msg( "A", ["Message 2 to A"] )
+    gen_server_msg( "B", ["Message 2 to B"] )
     
     # Retrieve messages for us
     msg = gen_server_msg_get("MAIN")
@@ -346,6 +390,7 @@ def main():
         resp = gen_server_response_get("MAIN")
         
     # Terminate servers
+    sleep(1)
     gen_server_term_all()
     
 if __name__ == '__main__':
