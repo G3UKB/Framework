@@ -24,7 +24,7 @@
 #
 
 """
-    The publish/subscribe system is a layer on top of gen_server. It's a thin layer
+    The publish/subscribe system is a layer on top of gen_server. It's a very thin layer
     but provides a level of abstraction so senders and receivers are decoupled.
   
     Pub/sub should be used primarily for send and forget operatiosn that happen multiple
@@ -45,7 +45,11 @@
     to subscribe to. Topic names and task names are strings. If a topic does not exist it will be created.
 
         ps_subscribe( name, topic )
-
+        
+    Unsubscribe name from topic.
+    
+        ps_unsubscribe( name, topic )
+        
     Publish to a topic where * is the opaque data to send and s'topic' is the topic name. 
     If a topic does not exist a message will be logged but it won't fail.
     Subscribers should therefore subscribe before publishing starts. Note that this
@@ -53,12 +57,17 @@
 
         ps_publish( topic, * )
         
+    Get a subscriber list for topic 'topic'.
+    
+        subscribers = ps_list( topic )
+        
 """
 
 # System imports
 import threading
 import queue
 from time import sleep
+import copy
 
 # Application imports
 import gen_server
@@ -69,7 +78,7 @@ import gen_server
 # This will be accessed from multiple threads
 #
 # Holds refs in the form topic: task-name
-__ps_d = {}
+__ps_dict = {}
 
 # Pub/Sub dict lock
 ps_lock = threading.Lock()
@@ -86,15 +95,102 @@ def __ps_release():
 
 def ps_subscribe( name, topic ):
     
+    __ps_lock()
     if topic in __ps_dict:
         __ps_dict[topic].append(name)
     else:
         __ps_dict[topic] = [name]
+    __ps_release()
+    
+def ps_unsubscribe( name, topic ):
+    
+    __ps_lock()
+    if topic in __ps_dict:
+        if name in __ps_dict[topic]:
+            __ps_dict[topic].remove(name)
+    __ps_release()
         
+
 def ps_publish( topic, data ):
     
+    __ps_lock()
     if topic in __ps_dict:
         subs = __ps_dict[topic]
         for sub in subs:
-            ref = gen_server_get_task_ref( sub )
+            task_ref = gen_server.gen_server_get_task_ref( sub )
+            if task_ref != None:
+                gen_server.gen_server_msg( sub, [data] )
+    __ps_release()
+                
+ 
+def ps_list( topic ):
+    __ps_lock()
+    if topic in __ps_dict:
+        r = copy.deepcopy(__ps_dict[topic])
+    else:
+        r = []
+    __ps_release()
+    return r
     
+# ====================================================================
+# Test code
+# NOTE: This code uses the match keyword as we are trying to emulate a
+# receive loop and pattern matching is by far the most elegant way.
+# However, this needs Python 3.10 which as of writing is pre-release.
+# You don't need pattern matching, it's just tidier.
+
+def main_dispatch( msg ):
+    print(msg)
+    
+def a_dispatch(msg):
+    match msg:
+        case "INIT":
+            print("INIT A")
+        case [data]:
+            match data:
+                case "Publish to TOPIC-1":
+                    print("A ", data)
+                case _:
+                    print("A [unknown message %s]" % (msg))
+        case _:
+            print("A [unknown message %s]" % (msg)) 
+
+def b_dispatch(msg):
+    match msg:
+        case "INIT":
+            print("INIT B")
+        case [data]:
+            match data:
+                case "Publish to TOPIC-1":
+                    print("B ", data)
+                case _:
+                    print("B [unknown message %s]" % (msg))
+        case _:
+            print("B [unknown message %s]" % (msg)) 
+    
+def main():
+    # Make a gen-server for us
+    gen_server.gen_server_new("A", a_dispatch)
+    gen_server.gen_server_new("B", b_dispatch)
+    
+    # Regiater main thread
+    q = queue.Queue()
+    gen_server.gen_server_reg( "MAIN", None, main_dispatch, q )
+    
+    # Subscribe A & B to a topic
+    ps_subscribe( "A", "TOPIC-1")
+    ps_subscribe( "B", "TOPIC-1")
+    
+    # Publish TOPIC-1
+    ps_publish( "TOPIC-1", "Publish to TOPIC-1" )
+    
+    # Get topic list
+    print("Subscribers: ", ps_list("TOPIC-1"))
+    
+    # Terminate servers
+    sleep(1)
+    gen_server.gen_server_term_all()
+    
+# Test entry point  
+if __name__ == '__main__':
+    main()   
