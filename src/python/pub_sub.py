@@ -55,3 +55,46 @@
         
 """
 
+# System imports
+import threading
+import queue
+from time import sleep
+
+# Application imports
+import gen_server
+
+# ====================================================================
+# PRIVATE
+# Pub/Sub dictionary
+# This will be accessed from multiple threads
+#
+# Holds refs in the form topic: task-name
+__ps_d = {}
+
+# Pub/Sub dict lock
+ps_lock = threading.Lock()
+
+def __ps_lock():
+    ps_lock.acquire()
+    
+def __ps_release():
+    ps_lock.release()
+ 
+ 
+# ====================================================================
+# PUBLIC
+
+def ps_subscribe( name, topic ):
+    
+    if topic in __ps_dict:
+        __ps_dict[topic].append(name)
+    else:
+        __ps_dict[topic] = [name]
+        
+def ps_publish( topic, data ):
+    
+    if topic in __ps_dict:
+        subs = __ps_dict[topic]
+        for sub in subs:
+            ref = gen_server_get_task_ref( sub )
+    
