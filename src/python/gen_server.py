@@ -269,7 +269,7 @@ class GenServer(threading.Thread):
             
     def __process(self, msg):
         # A message is of this form but data is opaque to us
-        # [name, * | [*, sender]]
+        # [name, [*] | [sender, [*]]]
         name, data = msg
         # Lookup the destination
         item = gen_server_get_task_ref(name)
@@ -282,7 +282,6 @@ class GenServer(threading.Thread):
             d(data)  
     
 # ====================================================================
-# PUBLIC
 # Test code
 # NOTE: This code uses the match keyword as we are trying to emulate a
 # receive loop and pattern matching is by far the most elegant way.
@@ -392,6 +391,7 @@ def main():
     # Terminate servers
     sleep(1)
     gen_server_term_all()
-    
+  
+# Test entry point  
 if __name__ == '__main__':
     main()
