@@ -18,10 +18,16 @@ function gs_release()
   unlock(lk)
 end
 
-function gs_store_ref(name, desc)
+function gs_store_desc(name, desc)
   gs_acquire()
   gs_d[name] = desc
   gs_release()
+end
+
+function gs_rm_desc( name )
+    gs_acquire()
+    delete!(gs_d, name)
+    gs_release()
 end
 
 function gs_get_desc( name )
@@ -42,6 +48,15 @@ function gs_get_all_desc()
     return descs
 end
 
-gs_store_ref("A", [1,2,3])
+# ====================================================================
+# PUBLIC
+# API
+
+
+# ====================================================================
+# TEST
+gs_store_desc("A", [1,2,3])
 println(gs_get_desc("A"))
+println(gs_get_all_desc())
+gs_rm_desc( "A" )
 println(gs_get_all_desc())
