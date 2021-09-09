@@ -24,16 +24,24 @@ function gs_store_ref(name, desc)
   gs_release()
 end
 
-function gs_get_ref( name )
+function gs_get_desc( name )
     gs_acquire()
     if haskey(gs_d, name)
-        r = gs_d[name]
+        desc = gs_d[name]
     else
-        r = nothing
+        desc = nothing
     end
     gs_release()
-    return r
+    return desc
+end
+
+function gs_get_all_desc()
+    gs_acquire()
+    descs = collect(values(gs_d))
+    gs_release()
+    return descs
 end
 
 gs_store_ref("A", [1,2,3])
-print(gs_get_ref("A"))
+println(gs_get_desc("A"))
+println(gs_get_all_desc())
