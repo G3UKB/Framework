@@ -127,7 +127,7 @@ from time import sleep
 # Task dictionary
 # This will be accessed from multiple threads
 #
-# Holds refs in the form name: [gen-server, queue]
+# Holds refs in the form {name: [gen-server, dispatcher, queue]}
 __gen_server_td = {}
 
 # Task dict lock
