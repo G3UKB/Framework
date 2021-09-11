@@ -52,6 +52,15 @@ end
 # PUBLIC
 # API
 
+function gs_new( name )
+
+  # Assign a channel for messages
+  ch = Channel{T=Any}(size=10)
+  # Create a new gen server
+  # No way to pass arguments to a task!!! What!!!
+  # At this point give up for now
+  t = Task(gen_server)
+
 
 # ====================================================================
 # TEST
