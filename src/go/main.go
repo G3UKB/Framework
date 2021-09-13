@@ -15,7 +15,6 @@ import (
 type GenServer func(string, func(), chan interface{})
 type Dispatcher func(interface{})
 type Descriptor struct {
-	g_s  GenServer
 	disp Dispatcher
 	ch   chan interface{}
 }
@@ -51,26 +50,66 @@ func gs_get_desc(name string) *Descriptor {
 	}
 }
 
+func gs_get_all_desc() []Descriptor {
+	d := []Descriptor{}
+	gs_lock()
+	for _, desc := range gs_desc {
+		d = append(d, desc)
+	}
+	gs_unlock()
+	return d
+}
+
+func gs_rm_desc(name string) {
+	gs_lock()
+	_, prs := gs_desc[name]
+	if prs {
+		delete(gs_desc, name)
+	}
+	gs_unlock()
+}
+
 // ====================================================================
 // PUBLIC
 // API
-func callback(interface{}) {
-	fmt.Println("Ballback...")
+func gs_new(name string, f Dispatcher) {
+	// Make a channel
+	ch := make(chan interface{})
+	// Create and run a new gen server
+	go gen_server(name, f, ch)
+	// Add to registry
+	d := Descriptor{}
+	d.disp = f
+	d.ch = ch
+	gs_store_desc(name, d)
 }
 
-func gen_server(s string, f func(), c chan interface{}) {
-	fmt.Println("GenServer...")
+// ====================================================================
+// PRIVATE
+// The gen-server task
+func gen_server(s string, f Dispatcher, c chan interface{}) {
+	fmt.Println("GenServer...", s)
 }
 
 // ====================================================================
 // PUBLIC
 // Testing
+func callback(interface{}) {
+	fmt.Println("Callback...")
+}
+
 func main() {
 	gs_desc = make(map[string]Descriptor)
 	d := Descriptor{}
-	d.g_s = gen_server
 	d.disp = callback
 	d.ch = make(chan interface{})
 	gs_store_desc("DESC", d)
 	fmt.Println(gs_get_desc("DESC"))
+	fmt.Println(gs_get_all_desc())
+	gs_rm_desc("DESC")
+	fmt.Println(gs_get_all_desc())
+
+	gs_new("REAL", callback)
+	var input string
+	fmt.Scanln(&input)
 }
