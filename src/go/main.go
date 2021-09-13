@@ -4,6 +4,8 @@ package main
 import (
 	"fmt"
 	"sync"
+	"time"
+	//"github.com/alexpantyukhin/go-pattern-match"
 )
 
 // ====================================================================
@@ -38,15 +40,15 @@ func gs_store_desc(name string, desc Descriptor) {
 	gs_unlock()
 }
 
-func gs_get_desc(name string) *Descriptor {
+func gs_get_desc(name string) (bool, Descriptor) {
 	d := Descriptor{}
 	gs_lock()
 	d, prs := gs_desc[name]
 	gs_unlock()
 	if prs {
-		return &d
+		return true, d
 	} else {
-		return &d
+		return false, d
 	}
 }
 
@@ -84,11 +86,39 @@ func gs_new(name string, f Dispatcher) {
 	gs_store_desc(name, d)
 }
 
+func gs_term(name string) {
+	prs, d := gs_get_desc(name)
+	if prs {
+		d.ch <- "quit"
+	}
+}
+
+func gs_term_all() {
+	descs := gs_get_all_desc()
+	for _, d := range descs {
+		d.ch <- "quit"
+	}
+}
+
 // ====================================================================
 // PRIVATE
 // The gen-server task
 func gen_server(s string, f Dispatcher, c chan interface{}) {
-	fmt.Println("GenServer...", s)
+	fmt.Println("GenServer ", s)
+	for {
+		msg := <-c
+		fmt.Println(msg)
+		// Can't figure how this works
+		// Probably give up on Go at this point
+		//isMatched, mr := match.Match(msg).
+		//	When("quit", {break}).
+		//	Result()
+		if msg == "quit" {
+			break
+		}
+		time.Sleep(time.Second * 1)
+	}
+	fmt.Println("GenServer exiting ... ", s)
 }
 
 // ====================================================================
@@ -100,16 +130,19 @@ func callback(interface{}) {
 
 func main() {
 	gs_desc = make(map[string]Descriptor)
-	d := Descriptor{}
-	d.disp = callback
-	d.ch = make(chan interface{})
-	gs_store_desc("DESC", d)
-	fmt.Println(gs_get_desc("DESC"))
-	fmt.Println(gs_get_all_desc())
-	gs_rm_desc("DESC")
-	fmt.Println(gs_get_all_desc())
+	//d := Descriptor{}
+	//d.disp = callback
+	//d.ch = make(chan interface{})
+	//gs_store_desc("DESC", d)
+	//fmt.Println(gs_get_desc("DESC"))
+	//fmt.Println(gs_get_all_desc())
+	//gs_rm_desc("DESC")
+	//fmt.Println(gs_get_all_desc())
 
 	gs_new("REAL", callback)
 	var input string
+	fmt.Scanln(&input)
+	fmt.Println(gs_get_all_desc())
+	gs_term("REAL")
 	fmt.Scanln(&input)
 }
