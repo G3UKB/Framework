@@ -100,6 +100,13 @@ func gs_term_all() {
 	}
 }
 
+func gs_msg(name string, msg interface{}) {
+	prs, d := gs_get_desc(name)
+	if prs {
+		d.ch <- msg
+	}
+}
+
 // ====================================================================
 // PRIVATE
 // The gen-server task
