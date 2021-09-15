@@ -139,7 +139,7 @@ function gs_msg(name, msg)
   d = gs_get_desc(name)
   if d != nothing
     _, ch = d
-    put!(ch, ["MSG", msg])
+    put!(ch, msg)
   end
 end
 
@@ -189,36 +189,53 @@ end
 
 function gen_server(ch)
 
-  println("Gen Server starting...")
+  name = nothing
+  dispatcher = nothing
   while true
     msg = take!(ch)
-    println(msg)
     cmd, args = msg
     if cmd == "INIT"
+      # Might want to do something different here
       name, dispatcher = args
+      println(name, " Gen Server running")
       dispatcher(msg)
-    end
-    if cmd == "QUIT"
+    elseif cmd == "MSG"
+      # Message for dispatcher
+      dispatcher(msg)
+    elseif cmd == "QUIT"
       break
+    else
+      println("Unknown message ", msg)
     end
   end
-  println("Gen Server terminating...")
+  println(name, " Gen Server terminating...")
 end
 
 # ====================================================================
 # TEST
-function dispatch(msg)
-  println("Dispatcher ", msg)
+function dispatch1(msg)
+  println("Dispatcher 1 ", msg)
+end
+
+function dispatch2(msg)
+  println("Dispatcher 2 ", msg)
 end
 
 function test()
-  # Make a new server
-  server = gs_new("T1", dispatch)
-  # Get its descriptor
-  d = gs_get_desc("T1")
-  _, ch = d
-  # Send quit
-  put!(ch, ["QUIT", []])
+  # Make two servers
+  gs1 = gs_new("GS1", dispatch1)
+  gs2 = gs_new("GS2", dispatch2)
+
+  # Send a message to both servers from main thread
+  gs_msg("GS1", ["MSG", ["Hello GS1 from MAIN"]])
+  gs_msg("GS2", ["MSG", ["Hello GS2 from MAIN"]])
+
+  readline()
+
+  # Quit servers
+  gs_term("GS1")
+  gs_term("GS2")
+
 end
 
 test()
