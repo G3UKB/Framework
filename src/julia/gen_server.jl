@@ -108,7 +108,7 @@ function gs_new(name, dispatcher)
   # and schedule...
   schedule(task)
   # Initialise server
-  put!(server.ch, "INIT")
+  put!(server.ch, ["INIT", [name, dispatcher]])
   return server
 end
 
@@ -122,7 +122,12 @@ function gen_server(ch)
   while true
     msg = take!(ch)
     println(msg)
-    if msg == "QUIT"
+    cmd, args = msg
+    if cmd == "INIT"
+      name, dispatcher = args
+      dispatcher(msg)
+    end
+    if cmd == "QUIT"
       break
     end
   end
@@ -131,8 +136,8 @@ end
 
 # ====================================================================
 # TEST
-function dispatch()
-  println("Dispatcher")
+function dispatch(msg)
+  println("Dispatcher ", msg)
 end
 
 function test()
@@ -141,7 +146,7 @@ function test()
   # Get its descriptor
   d = gs_get_desc(server, "T1")
   # Send quit
-  put!(d[2], "QUIT")
+  put!(d[2], ["QUIT", [nothing]])
 end
 
 test()
