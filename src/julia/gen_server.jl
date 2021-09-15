@@ -29,7 +29,7 @@ module GenServer
 using Match
 
 # External visible functions
-export gs_new
+export gs_new, gs_term, gs_term_all, gs_msg, gs_msg_get, gs_response, gs_response_get, gs_reg, gs_unreg
 
 # ====================================================================
 # PRIVATE
@@ -116,6 +116,71 @@ function gs_new(name, dispatcher)
   # Initialise server
   put!(server.ch, ["INIT", [name, dispatcher]])
   return server
+end
+
+function gs_term(name)
+
+  d = gs_get_desc(name)
+  if d != nothing
+    _, ch = d
+    put!(ch, ["QUIT", []])
+  end
+end
+
+function gs_term_all()
+    ds = gs_get_all_desc()
+    for d in ds
+      _, ch = d
+      put!(ch, ["QUIT", []])
+    end
+end
+
+function gs_msg(name, msg)
+  d = gs_get_desc(name)
+  if d != nothing
+    _, ch = d
+    put!(ch, ["MSG", msg])
+  end
+end
+
+function gs_msg_get(name)
+  d = gs_get_desc(name)
+  msg = nothing
+  if d != nothing
+    _, ch = d
+    if isready(ch)
+      msg = take!(ch)
+    end
+  end
+  return msg
+end
+
+function gs_response(name, response)
+  d = gs_get_desc(name)
+  if d != nothing
+    _, ch = d
+    put!(ch, ["RESP", response])
+  end
+end
+
+function gs_response_get(name)
+  d = gs_get_desc(name)
+  response = nothing
+  if d != nothing
+    _, ch = d
+    if isready(ch)
+      response = take!(ch)
+    end
+  end
+  return response
+end
+
+function gs_reg(name, dispatcher, channel)
+  gs_store_desc(name, [dispatcher, ch])
+end
+
+function gs_unreg(name)
+  gs_rm_desc(name)
 end
 
   # ====================================================================
