@@ -24,7 +24,11 @@
 #
 
 module GenServer
-# External API
+
+# Using
+using Match
+
+# External visible functions
 export gs_new
 
 # ====================================================================
@@ -36,58 +40,60 @@ export gs_new
 #
 # Holds refs in the form {name: [dispatcher, queue]}
 gs_d = Dict{String, Array}()
+# Lock for gs_d
+lk = ReentrantLock()
 
 # =================================
 # The Task container
 mutable struct CGenServer
   # Fields
-  # Locks are required for any data with multiple thread readers/writers
-  lk::ReentrantLock
+  # Channel to be used by this instance of gen-server
   ch::Channel
+  # Function to dispatch messages to by this instance of gen-server
   dispatcher
 
   # Inner constructor
-  CGenServer() = new(ReentrantLock(), Channel(10))
+  CGenServer() = new(Channel(10))
 end
 # =================================
 
 # =================================
 # Member functions
-function gs_acquire(x::CGenServer)
-  lock(x.lk)
+function gs_acquire()
+  lock(lk)
 end
 
-function gs_release(x::CGenServer)
-    unlock(x.lk)
+function gs_release()
+    unlock(lk)
 end
 
-function gs_store_desc(x::CGenServer, name, desc)
-  gs_acquire(x)
+function gs_store_desc(name, desc)
+  gs_acquire()
   gs_d[name] = desc
-  gs_release(x)
+  gs_release()
 end
 
-function gs_rm_desc(x::CGenServer, name)
-    gs_acquire(x)
+function gs_rm_desc(name)
+    gs_acquire()
     delete!(gs_d, name)
-    gs_release(x)
+    gs_release()
 end
 
-function gs_get_desc(x::CGenServer, name)
-    gs_acquire(x)
+function gs_get_desc(name)
+    gs_acquire()
     if haskey(gs_d, name)
         desc = gs_d[name]
     else
         desc = nothing
     end
-    gs_release(x)
+    gs_release()
     return desc
 end
 
-function gs_get_all_desc(x::CGenServer)
-    gs_acquire(x)
+function gs_get_all_desc()
+    gs_acquire()
     descs = collect(values(gs_d))
-    gs_release(x)
+    gs_release()
     return descs
 end
 
@@ -104,7 +110,7 @@ function gs_new(name, dispatcher)
   # Create a task to run the server and bind to a channel
   task = Task(() -> gen_server(server.ch))
   # Store server descriptor
-  gs_store_desc(server, name, [server.dispatcher, server.ch])
+  gs_store_desc(name, [server.dispatcher, server.ch])
   # and schedule...
   schedule(task)
   # Initialise server
@@ -144,9 +150,10 @@ function test()
   # Make a new server
   server = gs_new("T1", dispatch)
   # Get its descriptor
-  d = gs_get_desc(server, "T1")
+  d = gs_get_desc("T1")
+  _, ch = d
   # Send quit
-  put!(d[2], ["QUIT", [nothing]])
+  put!(ch, ["QUIT", []])
 end
 
 test()
