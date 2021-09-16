@@ -102,7 +102,6 @@ end
 # API
 
 function gs_new(name, dispatcher)
-
   # Create a new server instance
   server = CGenServer()
   # Set the dispatcher
@@ -137,6 +136,7 @@ end
 
 function gs_msg(name, msg)
   d = gs_get_desc(name)
+  #println("*** name ", name, "***d ", d)
   if d != nothing
     _, ch = d
     put!(ch, msg)
@@ -175,7 +175,7 @@ function gs_response_get(name)
   return response
 end
 
-function gs_reg(name, dispatcher, channel)
+function gs_reg(name, dispatcher, ch)
   gs_store_desc(name, [dispatcher, ch])
 end
 
@@ -188,7 +188,6 @@ end
   # The gen-server task
 
 function gen_server(ch)
-
   name = nothing
   dispatcher = nothing
   while true
@@ -212,20 +211,26 @@ function gen_server(ch)
 end
 
 # ====================================================================
+# ====================================================================
 # TEST
 function main_dispatch(msg)
-  println("MAIN Dispatcher ", msg)
-  gs_msg("GS2", ["MSG", ["Hello GS2 from GS1"]])
+  @match msg begin
+    [c, [m]] =>
+      @match m begin
+        "Message 1: GS1 -> MAIN" => println("MAIN: Msg 1 from GS1 ")
+        "Message 1: GS2 -> MAIN" => println("MAIN: Msg 1 from GS2 ")
+      end
+  end
 end
 
 function gs1_dispatch(msg)
   println("GS1 Dispatcher ", msg)
-  gs_msg("GS2", ["MSG", ["Hello GS2 from GS1"]])
+  gs_msg("MAIN", ["MSG", ["Message 1: GS1 -> MAIN"]])
 end
 
 function gs2_dispatch(msg)
   println("GS2 Dispatcher ", msg)
-  gs_msg("GS1", ["MSG", ["Hello GS1 from GS2"]])
+  gs_msg("MAIN", ["MSG", ["Message 1: GS2 -> MAIN"]])
 end
 
 function test()
@@ -243,39 +248,33 @@ function test()
   gs_msg("GS1", ["MSG", ["Message 2: MAIN -> GS1"]])
   gs_msg("GS2", ["MSG", ["Message 2: MAIN -> GS2"]])
 
-  # Retrieve messages for us
-  msg = gs_msg_get("MAIN")
-  while msg != nothing
-    print(msg)
-    msg = gs_msg_get("MAIN")
-  end
-
   # Send message to GS1 and GS2 from MAIN thread that require a response
-  gs_msg("GS1", ["MSG", ["MAIN", "Message 3: MAIN -> GS1"]])
-  gs_msg("GS2", ["MSG", ["MAIN", "Message 3: MAIN -> GS2"]])
+  #gs_msg("GS1", ["MSG", ["MAIN", "Message 3: MAIN -> GS1"]])
+  #gs_msg("GS2", ["MSG", ["MAIN", "Message 3: MAIN -> GS2"]])
 
-  # Retrieve responses for us
-  resp = gs_response_get("MAIN")
-  while resp != nothing
-    print(resp)
-    msg = gs_response_get("MAIN")
+  for i in 1:10
+    # Retrieve messages for us
+    msg = gs_msg_get("MAIN")
+    while msg != nothing
+      main_dispatch(msg)
+      msg = gs_msg_get("MAIN")
+    end
+
+    # Retrieve responses for us
+    #resp = gs_response_get("MAIN")
+    #while resp != nothing
+    # print(resp)
+    # resp = gs_response_get("MAIN")
+    #end
+    sleep(0.1)
   end
-
-  # Wait as we don't want to terminate while things are still in progress
-  println("Any key to continue")
-  readline()
-
-  # Terminate servers
-  gs_term("GS1")
-  gs_term("GS2")
+  gs_term_all()
 
 end
 
+# ====================================================================
 # Run tests
 test()
-# Don't close whils terminate still in progress
-println("Any key to continue")
-readline()
 println("Test complete")
 
 # end Module
