@@ -213,32 +213,68 @@ end
 
 # ====================================================================
 # TEST
-function dispatch1(msg)
-  println("Dispatcher 1 ", msg)
+function main_dispatch(msg)
+  println("MAIN Dispatcher ", msg)
+  gs_msg("GS2", ["MSG", ["Hello GS2 from GS1"]])
 end
 
-function dispatch2(msg)
-  println("Dispatcher 2 ", msg)
+function gs1_dispatch(msg)
+  println("GS1 Dispatcher ", msg)
+  gs_msg("GS2", ["MSG", ["Hello GS2 from GS1"]])
+end
+
+function gs2_dispatch(msg)
+  println("GS2 Dispatcher ", msg)
+  gs_msg("GS1", ["MSG", ["Hello GS1 from GS2"]])
 end
 
 function test()
   # Make two servers
-  gs1 = gs_new("GS1", dispatch1)
-  gs2 = gs_new("GS2", dispatch2)
+  gs1 = gs_new("GS1", gs1_dispatch)
+  gs2 = gs_new("GS2", gs2_dispatch)
+
+  # Register main thread
+  ch = Channel(10)
+  gs_reg("MAIN", main_dispatch, ch)
 
   # Send a message to both servers from main thread
-  gs_msg("GS1", ["MSG", ["Hello GS1 from MAIN"]])
-  gs_msg("GS2", ["MSG", ["Hello GS2 from MAIN"]])
+  gs_msg("GS1", ["MSG", ["Message 1: MAIN -> GS1"]])
+  gs_msg("GS2", ["MSG", ["Message 1: MAIN -> GS2"]])
+  gs_msg("GS1", ["MSG", ["Message 2: MAIN -> GS1"]])
+  gs_msg("GS2", ["MSG", ["Message 2: MAIN -> GS2"]])
 
+  # Retrieve messages for us
+  msg = gs_msg_get("MAIN")
+  while msg != nothing
+    print(msg)
+    msg = gs_msg_get("MAIN")
+  end
+
+  # Send message to GS1 and GS2 from MAIN thread that require a response
+  gs_msg("GS1", ["MSG", ["MAIN", "Message 3: MAIN -> GS1"]])
+  gs_msg("GS2", ["MSG", ["MAIN", "Message 3: MAIN -> GS2"]])
+
+  # Retrieve responses for us
+  resp = gs_response_get("MAIN")
+  while resp != nothing
+    print(resp)
+    msg = gs_response_get("MAIN")
+  end
+
+  # Wait as we don't want to terminate while things are still in progress
+  println("Any key to continue")
   readline()
 
-  # Quit servers
+  # Terminate servers
   gs_term("GS1")
   gs_term("GS2")
 
 end
 
+# Run tests
 test()
+# Don't close whils terminate still in progress
+println("Any key to continue")
 readline()
 println("Test complete")
 
