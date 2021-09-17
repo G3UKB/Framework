@@ -215,22 +215,104 @@ end
 # TEST
 function main_dispatch(msg)
   @match msg begin
+    # Message without response or response
     [c, [m]] =>
+      @match c begin
+        "MSG" =>
+          # Message type
+          @match m begin
+            "Message 1: GS1 -> MAIN" => println("MAIN: Msg 1 from GS1 ")
+            "Message 1: GS2 -> MAIN" => println("MAIN: Msg 1 from GS2 ")
+          end
+        "RESP" =>
+          # Response type
+          "Response 1: GS1 -> MAIN" => println("MAIN: Resp 1 from GS1 ")
+          "Response 1: GS2 -> MAIN" => println("MAIN: Resp 1 from GS2 ")
+      end
+    # Message requires response
+    [c, [n, m]] =>
+      # Message type
       @match m begin
-        "Message 1: GS1 -> MAIN" => println("MAIN: Msg 1 from GS1 ")
-        "Message 1: GS2 -> MAIN" => println("MAIN: Msg 1 from GS2 ")
+        "Message with response 1: GS1 -> MAIN" =>
+          begin
+            println("MAIN: Msg with resp 1 from GS1 ")
+            gs_msg(n, ["RESP", ["Message 1 response : MAIN -> GS1"]])
+          end
+        "Message with response 1: GS2 -> MAIN" =>
+          begin
+            println("MAIN: Msg with resp 1 from GS2 ")
+            gs_msg(n, ["RESP", ["Message 1 response : MAIN -> GS2"]])
+          end
       end
   end
 end
 
 function gs1_dispatch(msg)
-  println("GS1 Dispatcher ", msg)
-  gs_msg("MAIN", ["MSG", ["Message 1: GS1 -> MAIN"]])
+  @match msg begin
+    # Message without response or response
+    [c, [m]] =>
+      @match c begin
+        "MSG" =>
+          # Message type
+          @match m begin
+            "Message 1: MAIN -> GS1" => println("GS1: Msg 1 from MAIN ")
+            "Message 2: MAIN -> GS1" => println("GS1: Msg 2 from MAIN ")
+          end
+        "RESP" =>
+          # Response type
+          "Response 1: MAIN -> GS1" => println("GS1: Resp 1 from MAIN ")
+          "Response 2: MAIN -> GS1" => println("GS1: Resp 1 from MAIN ")
+      end
+    # Message requires response
+    [c, [n, m]] =>
+      # Message type
+      @match m begin
+        "Message with response 1: MAIN -> GS1" =>
+          begin
+            println("GS1: Msg with resp 1 from MAIN ")
+            gs_msg(n, ["RESP", ["Message 1 response : GS1 -> MAIN"]])
+          end
+        "Message with response 2: MAIN -> GS1" =>
+          begin
+            println("MAIN: Msg with resp 1 from MAIN ")
+            gs_msg(n, ["RESP", ["Message 2 response : GS1 -> MAIN"]])
+          end
+      end
+  end
 end
 
 function gs2_dispatch(msg)
-  println("GS2 Dispatcher ", msg)
-  gs_msg("MAIN", ["MSG", ["Message 1: GS2 -> MAIN"]])
+  @match msg begin
+    # Message without response or response
+    [c, [m]] =>
+      @match c begin
+        "MSG" =>
+          # Message type
+          @match m begin
+            "Message 1: MAIN -> GS2" => println("GS2: Msg 1 from MAIN ")
+            "Message 2: MAIN -> GS2" => println("GS2: Msg 2 from MAIN ")
+          end
+        "RESP" =>
+          # Response type
+          "Response 1: MAIN -> GS2" => println("GS2: Resp 1 from MAIN ")
+          "Response 2: MAIN -> GS2" => println("GS2: Resp 1 from MAIN ")
+      end
+    # Message requires response
+    [c, [n, m]] =>
+      # Message type
+      @match m begin
+        "Message with response 1: MAIN -> GS2" =>
+          begin
+            println("GS2: Msg with resp 1 from MAIN ")
+            gs_msg(n, ["RESP", ["Message 1 response : GS2 -> MAIN"]])
+          end
+        "Message with response 2: MAIN -> GS2" =>
+          begin
+            println("MAIN: Msg with resp 1 from MAIN ")
+            gs_msg(n, ["RESP", ["Message 2 response : GS2 -> MAIN"]])
+          end
+      end
+  end
 end
 
 function test()
@@ -249,8 +331,8 @@ function test()
   gs_msg("GS2", ["MSG", ["Message 2: MAIN -> GS2"]])
 
   # Send message to GS1 and GS2 from MAIN thread that require a response
-  #gs_msg("GS1", ["MSG", ["MAIN", "Message 3: MAIN -> GS1"]])
-  #gs_msg("GS2", ["MSG", ["MAIN", "Message 3: MAIN -> GS2"]])
+  gs_msg("GS1", ["MSG", ["MAIN", "Message with response 1: MAIN -> GS1"]])
+  gs_msg("GS2", ["MSG", ["MAIN", "Message with response 1: MAIN -> GS2"]])
 
   for i in 1:10
     # Retrieve messages for us
@@ -261,21 +343,22 @@ function test()
     end
 
     # Retrieve responses for us
-    #resp = gs_response_get("MAIN")
-    #while resp != nothing
-    # print(resp)
-    # resp = gs_response_get("MAIN")
-    #end
+    resp = gs_response_get("MAIN")
+    while resp != nothing
+     main_dispatch(resp)
+     resp = gs_response_get("MAIN")
+    end
     sleep(0.1)
   end
+
+  # Term all servers
   gs_term_all()
 
-end
+end # test
 
 # ====================================================================
 # Run tests
 test()
 println("Test complete")
 
-# end Module
-end
+end # Module
