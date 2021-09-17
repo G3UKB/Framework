@@ -185,7 +185,7 @@ function gen_server(ch)
       name, dispatcher = args
       println(name, " Gen Server running")
       dispatcher(msg)
-    elseif cmd == "MSG"
+    elseif cmd == "MSG" || cmd == "RESP"
       # Message for dispatcher
       dispatcher(msg)
     elseif cmd == "QUIT"
@@ -244,8 +244,14 @@ function gs1_dispatch(msg)
         "MSG" =>
           # Message type
           @match m begin
-            "Message 1: MAIN -> GS1" => println("GS1: Msg 1 from MAIN ")
+            "Message 1: MAIN -> GS1" =>
+              begin
+                println("GS1: Msg 1 from MAIN ")
+                # Send a message to GS2
+                gs_msg("GS2", ["Message 1: GS1 -> GS2"])
+              end
             "Message 2: MAIN -> GS1" => println("GS1: Msg 2 from MAIN ")
+            "Message 1: GS2 -> GS1" => println("GS1: Msg 1 from GS2")
           end
         "RESP" =>
           # Response type
@@ -280,14 +286,20 @@ function gs2_dispatch(msg)
         "MSG" =>
           # Message type
           @match m begin
-            "Message 1: MAIN -> GS2" => println("GS2: Msg 1 from MAIN ")
-            "Message 2: MAIN -> GS2" => println("GS2: Msg 2 from MAIN ")
+            "Message 1: MAIN -> GS2" =>
+            begin
+              println("GS2: Msg 1 from MAIN ")
+              # Send a message to GS1
+              gs_msg("GS1", ["Message 1: GS2 -> GS1"])
+            end
+            "Message 2: MAIN -> GS2" => println("GS2: Msg 2 from MAIN")
+            "Message 1: GS1 -> GS2" => println("GS2: Msg 1 from GS1")
           end
         "RESP" =>
           # Response type
           @match m begin
-            "Response 1: MAIN -> GS2" => println("GS2: Resp 1 from MAIN ")
-            "Response 2: MAIN -> GS2" => println("GS2: Resp 1 from MAIN ")
+            "Response 1: MAIN -> GS2" => println("GS2: Resp 1 from MAIN")
+            "Response 2: MAIN -> GS2" => println("GS2: Resp 1 from MAIN")
           end
       end
     # Message requires response
@@ -323,7 +335,7 @@ function test()
   gs_msg("GS1", ["Message 2: MAIN -> GS1"])
   gs_msg("GS2", ["Message 2: MAIN -> GS2"])
 
-  # Send message to GS1 and GS2 from MAIN thread that require a response
+  # Send message to GS1 and GS2 from MAIN thread that requires a response
   gs_msg("GS1", ["MAIN", "Message with response 1: MAIN -> GS1"])
   gs_msg("GS2", ["MAIN", "Message with response 1: MAIN -> GS2"])
 
@@ -344,7 +356,9 @@ end # test
 
 # ====================================================================
 # Run tests
-test()
+for i in 1:10
+  test()
+end
 println("Test complete")
 
 end # Module
