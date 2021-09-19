@@ -35,6 +35,7 @@ using Match
 # ====================================================================
 # TEST
 function main_dispatch(msg)
+  println("MAIN=",Threads.threadid())
   @match msg begin
     # Message without response or response
     [c, [m]] =>
@@ -71,6 +72,7 @@ function main_dispatch(msg)
 end
 
 function gs1_dispatch(msg)
+  println("GS1=",Threads.threadid())
   @match msg begin
     # Message without response or response
     [c, [m]] =>
@@ -113,6 +115,7 @@ function gs1_dispatch(msg)
 end
 
 function gs2_dispatch(msg)
+  println("GS2=",Threads.threadid())
   @match msg begin
     # Message without response or response
     [c, [m]] =>
@@ -156,8 +159,11 @@ end
 
 function test()
   # Make two servers
-  gs1 = GenServer.gs_new("GS1", gs1_dispatch)
-  gs2 = GenServer.gs_new("GS2", gs2_dispatch)
+  # Cooperative server
+  gs1 = GenServer.gs_new("GS1", gs1_dispatch, Int(GenServer.COOP))
+  # Parallel server
+  gs2 = GenServer.gs_new("GS2", gs2_dispatch, Int(GenServer.PAR))
+  sleep(0.2)
 
   # Register main thread
   ch = Channel(10)

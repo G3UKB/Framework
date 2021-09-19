@@ -25,8 +25,13 @@
 
 module GenServer
 
+import Base.Threads.@spawn
+
 # External visible functions
-export gs_new, gs_term, gs_term_all, gs_msg, gs_msg_get, gs_response, gs_response_get, gs_reg, gs_unreg
+export THRD_T, COOP, PAR, gs_new, gs_term, gs_term_all, gs_msg, gs_msg_get, gs_response, gs_response_get, gs_reg, gs_unreg
+
+# Thread type
+@enum THRD_T COOP = 0 PAR = 1
 
 # ====================================================================
 # PRIVATE
@@ -98,17 +103,29 @@ end
 # PUBLIC
 # API
 
-function gs_new(name, dispatcher)
+function gs_new(name, dispatcher, thrd_type)
   # Create a new server instance
   server = CGenServer()
   # Set the dispatcher
   server.dispatcher = dispatcher
+
   # Create a task to run the server and bind to a channel
-  task = Task(() -> gen_server(server.ch))
+  # We can choose what kind of threads e want or mix them at
+  # This runs cooperative threads
+  if thrd_type == 0
+    begin
+      task = Task(() -> gen_server(server.ch))
+      schedule(task)
+    end
+  else
+    begin
+      # This runs OS threads, one per
+      task = @spawn gen_server(server.ch)
+    end
+  end
+
   # Store server descriptor
   gs_store_desc(name, [server.dispatcher, server.ch])
-  # and schedule...
-  schedule(task)
   # Initialise server
   put!(server.ch, ["INIT", [name, dispatcher]])
   return server
