@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # pub_sub.jl
 #
@@ -66,7 +65,7 @@ The publish/subscribe system is a layer on top of gen_server. It's a very thin l
 module PubSub
 
 # Modules
-include("gen_server.jl")
+#include("gen_server.jl")
 
 # External visible functions
 export ps_subscribe, ps_unsubscribe, ps_publish, ps_list
@@ -80,7 +79,7 @@ export ps_subscribe, ps_unsubscribe, ps_publish, ps_list
 # This will be accessed from multiple threads
 #
 # Holds refs in the form topic: task-name
-ps_d = Dict{String, String}()
+ps_d = Dict{String, Array}()
 # Lock for ps_d
 lk = ReentrantLock()
 
@@ -89,7 +88,7 @@ function ps_acquire()
 end
 
 function ps_release()
-    unlock(lk)
+  unlock(lk)
 end
 
 # ====================================================================
@@ -98,7 +97,9 @@ end
 function ps_subscribe(name, topic)
   ps_acquire()
   if haskey(ps_d, topic)
-    ps_d[topic].append(name)
+    append!(ps_d[topic], [name])
+  else
+    ps_d[topic] = [name]
   end
   ps_release()
 end
@@ -129,8 +130,10 @@ end
 
 function ps_list(topic)
   ps_acquire()
+  copyof = []
     if haskey(ps_d, topic)
-      copyof = ps_d[topic]
+      copyof = deepcopy(ps_d[topic])
+    end
   ps_release()
   return copyof
 end

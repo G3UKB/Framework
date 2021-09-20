@@ -1,7 +1,7 @@
 #
-# gen_server_test.jl
+# pub_sub_test.jl
 #
-# Tes t module for Generic Server implementation
+# Test module for Publish/Subscribe implementation
 #
 # Copyright (C) 2021 by G3UKB Bob Cowdery
 # This program is free software; you can redistribute it and/or modify
@@ -22,10 +22,9 @@
 #     bob@bobcowdery.plus.com
 #
 
-module GenServerTest
-
 # Modules
 include("gen_server.jl")
+include("pub_sub.jl")
 
 # Using
 using Match
@@ -168,36 +167,25 @@ function test()
   ch = Channel(10)
   GenServer.gs_reg("MAIN", main_dispatch, ch)
 
-  # Send a message to both servers from main thread
-  GenServer.gs_msg("GS1", ["Message 1: MAIN -> GS1"])
-  GenServer.gs_msg("GS2", ["Message 1: MAIN -> GS2"])
-  GenServer.gs_msg("GS1", ["Message 2: MAIN -> GS1"])
-  GenServer.gs_msg("GS2", ["Message 2: MAIN -> GS2"])
+  # Subscribe A & B to a topic
+  PubSub.ps_subscribe( "GS1", "TOPIC-1")
+  PubSub.ps_subscribe( "GS2", "TOPIC-1")
 
-  # Send message to GS1 and GS2 from MAIN thread that requires a response
-  GenServer.gs_msg("GS1", ["MAIN", "Message with response 1: MAIN -> GS1"])
-  GenServer.gs_msg("GS2", ["MAIN", "Message with response 1: MAIN -> GS2"])
+  # Publish TOPIC-1
+  PubSub.ps_publish( "TOPIC-1", "Publish to TOPIC-1" )
 
-  # Retrieve messages and any responses for us
-  for i in 1:10
-    msg = GenServer.gs_msg_get("MAIN")
-    while msg != nothing
-      main_dispatch(msg)
-      msg = GenServer.gs_msg_get("MAIN")
-    end
-    sleep(0.1)
-  end
+  # Get topic list
+  println("Subscribers: ", PubSub.ps_list("TOPIC-1"))
 
-  # Term all servers
+  # Terminate servers
+  sleep(1)
   GenServer.gs_term_all()
 
-end # test
+end
 
 # ====================================================================
 # Run tests
 for i in 1:1
   test()
 end
-println("Gen Server test complete")
-
-end # module
+println("Pub/Sub test complete")

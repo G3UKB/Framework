@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # gen_server.jl
 #
@@ -156,7 +155,7 @@ function gs_acquire()
 end
 
 function gs_release()
-    unlock(lk)
+  unlock(lk)
 end
 
 function gs_store_desc(name, desc)
@@ -166,27 +165,27 @@ function gs_store_desc(name, desc)
 end
 
 function gs_rm_desc(name)
-    gs_acquire()
-    delete!(gs_d, name)
-    gs_release()
+  gs_acquire()
+  delete!(gs_d, name)
+  gs_release()
 end
 
 function gs_get_desc(name)
-    gs_acquire()
-    if haskey(gs_d, name)
-        desc = gs_d[name]
-    else
-        desc = nothing
-    end
-    gs_release()
-    return desc
+  gs_acquire()
+  if haskey(gs_d, name)
+      desc = gs_d[name]
+  else
+      desc = nothing
+  end
+  gs_release()
+  return desc
 end
 
 function gs_get_all_desc()
-    gs_acquire()
-    descs = collect(values(gs_d))
-    gs_release()
-    return descs
+  gs_acquire()
+  descs = collect(values(gs_d))
+  gs_release()
+  return descs
 end
 
 # ====================================================================
