@@ -25,8 +25,11 @@
 # Modules
 #include("gen_server.jl")
 #include("pub_sub.jl")
-import "GenServer"
-import "PubSub"
+
+thisdir = dirname(@__FILE__())
+any(path -> path==thisdir, LOAD_PATH) || push!(LOAD_PATH, thisdir)
+using GenServer
+using PubSub
 
 # Using
 using Match

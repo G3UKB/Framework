@@ -61,10 +61,10 @@ The publish/subscribe system is a layer on top of gen_server. It's a very thin l
         subscribers = ps_list( topic )
 
 =#
-
 module PubSub
 
 # Modules
+#using GenServer
 
 # External visible functions
 export ps_subscribe, ps_unsubscribe, ps_publish, ps_list
