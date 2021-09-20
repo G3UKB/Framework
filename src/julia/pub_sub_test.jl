@@ -23,8 +23,10 @@
 #
 
 # Modules
-include("gen_server.jl")
-include("pub_sub.jl")
+#include("gen_server.jl")
+#include("pub_sub.jl")
+import "GenServer"
+import "PubSub"
 
 # Using
 using Match

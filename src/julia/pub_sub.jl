@@ -65,7 +65,6 @@ The publish/subscribe system is a layer on top of gen_server. It's a very thin l
 module PubSub
 
 # Modules
-#include("gen_server.jl")
 
 # External visible functions
 export ps_subscribe, ps_unsubscribe, ps_publish, ps_list
