@@ -83,9 +83,9 @@ function gs1_dispatch(msg)
         "MSG" =>
           # Message type
           @match m begin
-            "Message 1: MAIN -> GS1" =>
+            "Publish to TOPIC-1" =>
               begin
-                println("GS1: Msg 1 from MAIN ")
+                println("GS1: TOPIC-1 from MAIN")
                 # Send a message to GS2
                 GenServer.gs_msg("GS2", ["Message 1: GS1 -> GS2"])
               end
@@ -126,9 +126,9 @@ function gs2_dispatch(msg)
         "MSG" =>
           # Message type
           @match m begin
-            "Message 1: MAIN -> GS2" =>
+            "Publish to TOPIC-1" =>
             begin
-              println("GS2: Msg 1 from MAIN ")
+              println("GS2: TOPIC-1 from MAIN")
               # Send a message to GS1
               GenServer.gs_msg("GS1", ["Message 1: GS2 -> GS1"])
             end
@@ -177,7 +177,7 @@ function test()
   PubSub.ps_subscribe( "GS2", "TOPIC-1")
 
   # Publish TOPIC-1
-  PubSub.ps_publish( "TOPIC-1", "Publish to TOPIC-1" )
+  PubSub.ps_publish( "TOPIC-1", ["Publish to TOPIC-1"] )
 
   # Get topic list
   println("Subscribers: ", PubSub.ps_list("TOPIC-1"))

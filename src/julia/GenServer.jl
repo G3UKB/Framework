@@ -174,10 +174,8 @@ function gs_get_desc(name)
   gs_acquire()
   if haskey(gs_d, name)
       desc = gs_d[name]
-      print("Returned ", desc)
   else
       desc = nothing
-      print("Returned nothing")
   end
   gs_release()
   return desc
