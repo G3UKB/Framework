@@ -124,7 +124,7 @@ import queue
 from time import sleep
 
 # Application imports
-import * from fr_common
+from fr_common import *
 
 # ====================================================================
 # PRIVATE
@@ -136,19 +136,12 @@ __gen_server_td = {}
 
 # Task dict lock
 thrd_lock = threading.Lock()
-mp_lock = mp.Lock()
 
-def __gen_server_lock(mp_type):
-    if mp_type == MPTYPE.THREAD:
-        thrd_lock.acquire()
-    else:
-        mp_lock.acquire()
+def __gen_server_lock():
+    thrd_lock.acquire()
     
-def __gen_server_release(mp_type):
-    if mp_type == MPTYPE.THREAD:
-        thrd_lock.release()
-    else:
-        mp_lock.release()
+def __gen_server_release():
+    thrd_lock.release()
     
 def __gen_server_store_task_ref( name, ref ):
     __gen_server_lock()
@@ -265,7 +258,7 @@ def gen_server_reg_rm( name ):
 class ThrdServer(threading.Thread):
     
     def __init__(self, name, dispatcher, q):
-        super(GenServer, self).__init__()
+        super(ThrdServer, self).__init__()
         self.__name = name
         self.__dispatcher = dispatcher
         self.__q = q

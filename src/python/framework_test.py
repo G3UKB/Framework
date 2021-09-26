@@ -28,6 +28,7 @@ import queue
 from time import sleep
 
 # Application imports
+from fr_common import *
 import gen_server as gs
 import pub_sub as ps
 
@@ -113,8 +114,8 @@ def gs2_dispatch(msg):
     
 def main():
     # Make 2 gen-servers
-    gs.gen_server_new("GS1", gs1_dispatch)
-    gs.gen_server_new("GS2", gs2_dispatch)
+    gs.gen_server_new("GS1", gs1_dispatch, MPTYPE.THREAD)
+    gs.gen_server_new("GS2", gs2_dispatch, MPTYPE.PROCESS)
     
     # Regiater main thread
     q = queue.Queue()
