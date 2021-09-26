@@ -117,10 +117,14 @@
                 
 """
 
-# Application imports
+# System imports
 import threading
+import multiprocessing as mp
 import queue
 from time import sleep
+
+# Application imports
+import * from fr_common
 
 # ====================================================================
 # PRIVATE
@@ -131,13 +135,20 @@ from time import sleep
 __gen_server_td = {}
 
 # Task dict lock
-task_lock = threading.Lock()
+thrd_lock = threading.Lock()
+mp_lock = mp.Lock()
 
-def __gen_server_lock():
-    task_lock.acquire()
+def __gen_server_lock(mp_type):
+    if mp_type == MPTYPE.THREAD:
+        thrd_lock.acquire()
+    else:
+        mp_lock.acquire()
     
-def __gen_server_release():
-    task_lock.release()
+def __gen_server_release(mp_type):
+    if mp_type == MPTYPE.THREAD:
+        thrd_lock.release()
+    else:
+        mp_lock.release()
     
 def __gen_server_store_task_ref( name, ref ):
     __gen_server_lock()
@@ -169,12 +180,19 @@ def __gen_server_rm_task_ref( name ):
 # PUBLIC
 # API
 
-def gen_server_new( name, dispatcher ):
+def gen_server_new( name, dispatcher, mp_type ):
     
-    # Assign a queue
-    q = queue.Queue()
-    # Create a new gen-server
-    g_s = GenServer(name, dispatcher, q)
+    if mp_type == MPTYPE.THREAD:
+        # Assign a queue
+        q = queue.Queue()
+        # Create a new gen-server
+        g_s = ThrdServer(name, dispatcher, q)
+    else:
+        # Assign a queue
+        q = mp.Queue()
+        # Create a new gen-server
+        g_s = MultiprocessingServer(name, dispatcher, q)
+        
     # Add to the task registry
     __gen_server_store_task_ref(name, [g_s, dispatcher, q])
     # Start the gen-server loop
@@ -242,12 +260,50 @@ def gen_server_reg_rm( name ):
 
 # ====================================================================
 # PRIVATE
-# The gen-server task
+# The gen-server thread task
 
-class GenServer(threading.Thread):
+class ThrdServer(threading.Thread):
     
     def __init__(self, name, dispatcher, q):
         super(GenServer, self).__init__()
+        self.__name = name
+        self.__dispatcher = dispatcher
+        self.__q = q
+        self.__term = False
+        
+    def terminate(self):
+        self.__term = True
+        
+    def run(self):
+        while not self.__term:
+            try:
+                item = self.__q.get(block=True, timeout=1)
+                #print("***item ", item)
+                # Process message
+                self.__process(item)
+            except queue.Empty:
+                continue
+        print("GenServer %s terminating..." % (self.__name))
+            
+    def __process(self, msg):
+        # A message is of this form but data is opaque to us
+        # [name, [*] | [sender, [*]]]
+        name, data = msg
+        # Lookup the destination
+        item = gen_server_get_task_ref(name)
+        if item == None:
+            # Oops, no destination
+            print("GenServer - destination %s not found!" % (name))
+        else:
+            # Dispatch
+            gen_server, d, q = item
+            d(data)  
+
+# The gen-server multiprocessing task
+class MultiprocessingServer(mp.Process):
+    
+    def __init__(self, name, dispatcher, q):
+        super(MultiprocessingServer, self).__init__()
         self.__name = name
         self.__dispatcher = dispatcher
         self.__q = q
