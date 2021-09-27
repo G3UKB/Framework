@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# fr_common.py
+# routing.py
 #
-# Framework common
+# Manages shared routing data
 # 
 # Copyright (C) 2021 by G3UKB Bob Cowdery
 # This program is free software; you can redistribute it and/or modify
@@ -23,8 +23,9 @@
 #     bob@bobcowdery.plus.com
 #
 
-from enum import Enum
+# System imports
+from multiprocessing import Manager
+from time import sleep
 
-class MPTYPE(Enum):
-    THREAD = 1
-    PROCESS = 2
+# Application imports
+
