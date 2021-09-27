@@ -119,137 +119,94 @@
 
 # System imports
 import threading
-import multiprocessing as mp
 import queue
 from time import sleep
 
 # Application imports
-from fr_common import *
-
-# ====================================================================
-# PRIVATE
-# Task dictionary
-# This will be accessed from multiple threads
-#
-# Holds refs in the form {name: [gen-server, dispatcher, queue]}
-__gen_server_td = {}
-
-# Task dict lock
-thrd_lock = threading.Lock()
-
-def __gen_server_lock():
-    thrd_lock.acquire()
-    
-def __gen_server_release():
-    thrd_lock.release()
-    
-def __gen_server_store_task_ref( name, ref ):
-    __gen_server_lock()
-    __gen_server_td[name] = ref
-    __gen_server_release()
-
-def gen_server_get_task_ref( name ):
-    __gen_server_lock()
-    if name in  __gen_server_td:
-        r = __gen_server_td[name]
-    else:
-        r = None
-    __gen_server_release()
-    return r
-
-def __gen_server_get_all_ref():
-    __gen_server_lock()
-    refs = __gen_server_td.items()
-    __gen_server_release()
-    return refs
-    
-def __gen_server_rm_task_ref( name ):
-    __gen_server_lock()
-    if name in  __gen_server_td:
-        del __gen_server_td[name]
-    __gen_server_release()
+import td_manager
 
 # ====================================================================
 # PUBLIC
 # API
 
-def gen_server_new( name, dispatcher, mp_type ):
+class GenServer:
+    # Class variable for the task data manager
+    td_man = td_manager.TdManager()
     
-    if mp_type == MPTYPE.THREAD:
+    def __init__(self):
+        pass
+    
+    def server_new(self, name, dispatcher):
+        
+        self.__td_man = GenServer.td_man
         # Assign a queue
         q = queue.Queue()
         # Create a new gen-server
-        g_s = ThrdServer(name, dispatcher, q)
-    else:
-        # Assign a queue
-        q = mp.Queue()
-        # Create a new gen-server
-        g_s = MultiprocessingServer(name, dispatcher, q)
+        thrd_server = ThrdServer(name, dispatcher, q, self.__td_man)
+            
+        # Add to the task registry
+        self.__td_man.store_task_ref(name, [thrd_server, dispatcher, q])
+        # Start the gen-server loop
+        thrd_server.start()
+        # Initialise task
+        dispatcher("INIT")
         
-    # Add to the task registry
-    __gen_server_store_task_ref(name, [g_s, dispatcher, q])
-    # Start the gen-server loop
-    g_s.start()
-    # Initialise task
-    dispatcher("INIT")
+    def server_term(self, name):
+         item = self.__td_man.get_task_ref(name)
+         if item != None:
+            t, d, q = item
+            t.terminate()
+            t.join()
+            
+    def server_term_all(self):
+        items = self.__td_man.get_all_ref()
+        for item in items:
+            t, d, q = item
+            if t != None:
+                t.terminate()
+                t.join()
     
-def gen_server_term( name ):
-     item = gen_server_get_task_ref(name)
-     if item != None:
-        name, ref = item
-        if ref[0] != None:
-            ref[0].terminate()
-            ref[0].join()
-        
-def gen_server_term_all( ):
-    items = __gen_server_get_all_ref()
-    for item in items:
-        name, ref = item
-        if ref[0] != None:
-            ref[0].terminate()
-            ref[0].join()
-
-def gen_server_msg( name, message ):
-    item = gen_server_get_task_ref(name)
-    if item != None:
-        msg = [name, message]
-        gen_server, d, q = item
-        q.put(msg)
-
-def gen_server_msg_get(name):
-    item = gen_server_get_task_ref(name)
-    if item != None:
-        gen_server, d, q = item
-        try:
-            msg = q.get(block=True, timeout=0.1)
-            return msg
-        except queue.Empty:
-            return None
-        
-def gen_server_response(name, response):
-    item = gen_server_get_task_ref(name)
-    if item != None:
-        msg = [name, response]
-        gen_server, d, q = item
-        q.put(msg)
-
-def gen_server_response_get(name):
-    item = gen_server_get_task_ref(name)
-    if item != None:
-        gen_server, d, q = item
-        try:
-            msg = q.get(block=True, timeout=0.1)
-            return msg
-        except queue.Empty:
-            return None
-
-def gen_server_reg( name, task, dispatcher, q ):
-    # Add to the task registry
-    __gen_server_store_task_ref(name, [task, dispatcher, q])
-
-def gen_server_reg_rm( name ):
-    # Remove from task registry
-    __gen_server_rm_task_ref( name )
+    def server_msg(self, name, message):
+        item = self.__td_man.get_task_ref(name)
+        if item != None:
+            msg = [name, message]
+            _, d, q = item
+            q.put(msg)
+    
+    def server_msg_get(self, name):
+        item = self.__td_man.get_task_ref(name)
+        if item != None:
+            _, d, q = item
+            try:
+                msg = q.get(block=True, timeout=0.1)
+                return msg
+            except queue.Empty:
+                return None
+            
+    def server_response(self, name, response):
+        item = self.__td_man.get_task_ref(name)
+        if item != None:
+            msg = [name, response]
+            _, d, q = item
+            q.put(msg)
+    
+    def server_response_get(self, name):
+        item = self.__td_man.get_task_ref(name)
+        if item != None:
+            _, d, q = item
+            try:
+                msg = q.get(block=True, timeout=0.1)
+                return msg
+            except queue.Empty:
+                return None
+    
+    def server_reg(self, name, t, dispatcher, q):
+        # Add to the task registry
+        self.__td_man.store_task_ref(name, [t, dispatcher, q])
+    
+    def server_reg_rm(self, name):
+        # Remove from task registry
+       self.__td_man.rm_task_ref( name )
 
 # ====================================================================
 # PRIVATE
@@ -257,11 +214,12 @@ def gen_server_reg_rm( name ):
 
 class ThrdServer(threading.Thread):
     
-    def __init__(self, name, dispatcher, q):
+    def __init__(self, name, dispatcher, q, td_man):
         super(ThrdServer, self).__init__()
         self.__name = name
         self.__dispatcher = dispatcher
         self.__q = q
+        self.__td_man = td_man
         self.__term = False
         
     def terminate(self):
@@ -271,7 +229,6 @@ class ThrdServer(threading.Thread):
         while not self.__term:
             try:
                 item = self.__q.get(block=True, timeout=1)
-                #print("***item ", item)
                 # Process message
                 self.__process(item)
             except queue.Empty:
@@ -283,49 +240,11 @@ class ThrdServer(threading.Thread):
         # [name, [*] | [sender, [*]]]
         name, data = msg
         # Lookup the destination
-        item = gen_server_get_task_ref(name)
+        item = self.__td_man.get_task_ref(name)
         if item == None:
             # Oops, no destination
             print("GenServer - destination %s not found!" % (name))
         else:
             # Dispatch
-            gen_server, d, q = item
-            d(data)  
-
-# The gen-server multiprocessing task
-class MultiprocessingServer(mp.Process):
-    
-    def __init__(self, name, dispatcher, q):
-        super(MultiprocessingServer, self).__init__()
-        self.__name = name
-        self.__dispatcher = dispatcher
-        self.__q = q
-        self.__term = False
-        
-    def terminate(self):
-        self.__term = True
-        
-    def run(self):
-        while not self.__term:
-            try:
-                item = self.__q.get(block=True, timeout=1)
-                #print("***item ", item)
-                # Process message
-                self.__process(item)
-            except queue.Empty:
-                continue
-        print("GenServer %s terminating..." % (self.__name))
-            
-    def __process(self, msg):
-        # A message is of this form but data is opaque to us
-        # [name, [*] | [sender, [*]]]
-        name, data = msg
-        # Lookup the destination
-        item = gen_server_get_task_ref(name)
-        if item == None:
-            # Oops, no destination
-            print("GenServer - destination %s not found!" % (name))
-        else:
-            # Dispatch
-            gen_server, d, q = item
+            _, d, q = item
             d(data)  
