@@ -27,6 +27,20 @@
 from multiprocessing import Manager, Lock
 from time import sleep
 
+"""
+    Shared multiprocessing.Manager to store shared routing state. This is a dictionary of the form:
+        {process-name: [task-name, task-name, ...], process-name [...], ...}
+    It provides a lookup to find usually the Process within which a Task is implemented. Both names
+    are strings set when routes are added. It would be nice to be able to store an associated Queue
+    with the Process as this is the means to dispatch a message to another Process where it can be
+    forwarded to the appropriate Task. Unfortunately a Queue is not pickleable and can only be passed
+    directly to child processes so a dictionary of process name(s) to Queue is passed to all Processes.
+    This means that the hierarchy must be known in advance on program initialisation.
+    
+    The router passed in is an instance of multiprocessing.Manager. This is passed as an argument to each
+    process and then each Process can create an instance of Routing to provide the convienience access methods.
+"""
+
 class Routing:
     
     def __init__(self, router):
