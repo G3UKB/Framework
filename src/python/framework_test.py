@@ -43,11 +43,12 @@ import pub_sub as ps
 
 class FrTest:
 
-    def __init__(self, gs_inst, GS1, GS2):
+    def __init__(self, gs_inst, GS1, GS2, q1=None, q2=None):
         
         self.__gs_inst = gs_inst
         self.GS1 = GS1
         self.GS2 = GS2
+        print(q1,q2)
     
     def run(self):
         
@@ -188,7 +189,9 @@ def run_parent_process():
 # Run child instance tests
 def run_child_process():
     gs_inst = gs.GenServer()
-    p = mp.Process(target=FrTest(gs_inst, "C", "D").run)
+    q1 = mp.Queue()
+    q2 = mp.Queue()
+    p = mp.Process(target=FrTest(gs_inst, "C", "D", q1, q2).run)
     p.start()
     
 # Test entry point  

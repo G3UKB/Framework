@@ -24,8 +24,38 @@
 #
 
 # System imports
-from multiprocessing import Manager
+from multiprocessing import Manager, Lock
 from time import sleep
 
-# Application imports
-
+class Routing:
+    
+    def __init__(self):
+        manager = Manager()
+        self.__routes = manager.dict()
+        self.__lk = Lock()
+        
+    def add_route(self, process, tasks):
+        self.__lk.acquire()
+        self.__routes[process] = tasks
+        self.__lk.release()
+        
+    def get_route(self, process):
+        r = None
+        self.__lk.acquire()
+        if process in self.__routes:
+            r = self.__routes[name]
+        self.__lk.release()
+        return r
+        
+    def process_for_task(self, task):
+        r = None
+        self.__lk.acquire()
+        for process in self.__routes:
+            if task in self.__routes[process]:
+                r = process
+                break
+        self.__lk.release()
+        return r
+                
+            
+    
