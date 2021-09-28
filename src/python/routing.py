@@ -29,9 +29,8 @@ from time import sleep
 
 class Routing:
     
-    def __init__(self):
-        manager = Manager()
-        self.__routes = manager.dict()
+    def __init__(self, router):
+        self.__routes = router
         self.__lk = Lock()
         
     def add_route(self, process, tasks):
@@ -46,7 +45,14 @@ class Routing:
             r = self.__routes[name]
         self.__lk.release()
         return r
-        
+    
+    def get_routes(self):
+        r = None
+        self.__lk.acquire()
+        r = self.__routes
+        self.__lk.release()
+        return r
+    
     def process_for_task(self, task):
         r = None
         self.__lk.acquire()

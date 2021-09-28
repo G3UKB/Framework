@@ -33,6 +33,7 @@ from enum import Enum
 # Application imports
 import gen_server as gs
 import pub_sub as ps
+import routing
 
 # ====================================================================
 # Test code
@@ -43,12 +44,14 @@ import pub_sub as ps
 
 class FrTest:
 
-    def __init__(self, gs_inst, GS1, GS2, q1=None, q2=None):
+    def __init__(self, name, gs_inst, GS1, GS2, route_manager, q1=None, q2=None):
         
         self.__gs_inst = gs_inst
         self.GS1 = GS1
         self.GS2 = GS2
         print(q1,q2)
+        router = routing.Routing(route_manager)
+        print("Name:", name, router.get_routes(), sep=' ')
     
     def run(self):
         
@@ -182,23 +185,31 @@ class FrTest:
                 print("%s [unknown message %s]" % (self.GS2, msg))
     
 # Run parent instance tests
-def run_parent_process():
+def run_parent_process(route_manager):
+    router = routing.Routing(route_manager)
+    router.add_route("MAIN", ["A", "B"])
     gs_inst = gs.GenServer()
-    FrTest(gs_inst, "A", "B").run()
+    FrTest("PARENT", gs_inst, "A", "B", route_manager).run()
 
 # Run child instance tests
-def run_child_process():
+def run_child_process(route_manager):
+    router = routing.Routing(route_manager)
+    router.add_route("CHILD", ["C", "D"])
     gs_inst = gs.GenServer()
     q1 = mp.Queue()
     q2 = mp.Queue()
-    p = mp.Process(target=FrTest(gs_inst, "C", "D", q1, q2).run)
+    p = mp.Process(target=FrTest("CHILD", gs_inst, "C", "D", route_manager, q1, q2).run)
     p.start()
     
 # Test entry point  
 if __name__ == '__main__':
-    t1 = threading.Thread(target=run_parent_process)
+    # Make a shared routing manager to store routes in a dict
+    route_manager = mp.Manager().dict()
+    # Kick off a parent and child process
+    t1 = threading.Thread(target=run_parent_process, args=(route_manager,))
     t1.start()
-    t2 = threading.Thread(target=run_child_process)
+    t2 = threading.Thread(target=run_child_process, args=(route_manager,))
+    # Wait for completion
     t2.start()
     t1.join()
     t2.join()
