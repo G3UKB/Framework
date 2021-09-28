@@ -44,12 +44,12 @@ import routing
 
 class FrTest:
 
-    def __init__(self, name, gs_inst, GS1, GS2, route_manager, q1=None, q2=None):
+    def __init__(self, name, gs_inst, GS1, GS2, route_manager, q={}):
         
         self.__gs_inst = gs_inst
         self.GS1 = GS1
         self.GS2 = GS2
-        print(q1,q2)
+        print(q)
         router = routing.Routing(route_manager)
         print("Name:", name, router.get_routes(), sep=' ')
     
@@ -198,12 +198,12 @@ def run_child_process(route_manager):
     gs_inst = gs.GenServer()
     q1 = mp.Queue()
     q2 = mp.Queue()
-    p = mp.Process(target=FrTest("CHILD", gs_inst, "C", "D", route_manager, q1, q2).run)
+    p = mp.Process(target=FrTest("CHILD", gs_inst, "C", "D", route_manager, {"PARENT": q1, "CHILD": q2}).run)
     p.start()
     
 # Test entry point  
 if __name__ == '__main__':
-    # Make a shared routing manager to store routes in a dict
+    # Make the one and only shared routing manager to store routes in a dict
     route_manager = mp.Manager().dict()
     # Kick off a parent and child process
     t1 = threading.Thread(target=run_parent_process, args=(route_manager,))
