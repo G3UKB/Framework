@@ -205,10 +205,14 @@ function test()
 
   # Publish TOPIC-1
   PubSub.ps_publish( "TOPIC-1", ["Publish to TOPIC-1 subscribers"] )
-  sleep(1)
-  
+  sleep(0.1)
+
   # Get topic list
   println("Subscribers: ", PubSub.ps_list("TOPIC-1"))
+  # and delete subscribers
+  PubSub.ps_unsubscribe("GS1", "TOPIC-1")
+  PubSub.ps_unsubscribe("GS2", "TOPIC-1")
+  sleep(0.1)
 
   # Term all servers
   GenServer.gs_term_all()
@@ -217,7 +221,7 @@ end # test
 
 # ====================================================================
 # Run tests
-for i in 1:1
+for i in 1:2
   test()
 end
 println("Gen Server test complete")

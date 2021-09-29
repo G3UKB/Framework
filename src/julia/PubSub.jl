@@ -108,7 +108,11 @@ function ps_unsubscribe(name, topic)
   ps_acquire()
   if haskey(ps_d, topic)
     if name in ps_d[topic]
-      ps_d[topic] = setdiff(ps_d[topic], name)
+      #ps_d[topic] = setdiff(ps_d[topic], name)
+      filter!(e->e!=name, ps_d[topic])
+      if size(ps_d[topic])[1] == 0
+        delete!(ps_d, topic)
+      end
     end
   end
   ps_release()
