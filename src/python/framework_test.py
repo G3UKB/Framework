@@ -24,6 +24,7 @@
 #
 
 # System imports
+import os
 import multiprocessing as mp
 import threading
 import queue
@@ -44,22 +45,29 @@ import routing
 
 class FrTest:
 
-    def __init__(self, name, gs_inst, GS1, GS2, route_manager, q={}):
+    def __init__(self, name, gs_inst, ar_task_ids, mp_manager, qs={}):
         
+        # Save params
+        self.__name = name
         self.__gs_inst = gs_inst
-        self.GS1 = GS1
-        self.GS2 = GS2
-        print(q)
-        router = routing.Routing(route_manager)
-        print("Name:", name, router.get_routes(), sep=' ')
+        self.GS1 = ar_task_ids[0]
+        self.GS2 = ar_task_ids[1]
+        self.__qs = q
+        
+        # Make a routing manager
+        self.__router = routing.Routing(mp_manager)
     
+    # Entry point for process
     def run(self):
+        
+        # Print context
+        print("Context: ", os.getpid(), self.__name, self.__router.get_routes(), self.__qs, sep=' ')
         
         # Make 2 gen-servers
         self.__gs_inst.server_new(self.GS1, self.gs1_dispatch)
         self.__gs_inst.server_new(self.GS2, self.gs2_dispatch)
         
-        # Regiater main thread
+        # Regiater main thread for our process
         q = queue.Queue()
         self.__gs_inst.server_reg("MAIN", None, self.main_dispatch, q)
         
@@ -185,32 +193,47 @@ class FrTest:
                 print("%s [unknown message %s]" % (self.GS2, msg))
     
 # Run parent instance tests
-def run_parent_process(route_manager):
-    router = routing.Routing(route_manager)
-    router.add_route("MAIN", ["A", "B"])
+def run_parent_process(ar_task_ids, d_process_qs, mp_manager):
+    # Initialise a router
+    router = routing.Routing(mp_manager)
+    # Add tasks for the main process
+    router.add_route("PARENT", ar_task_ids)
+    # Make a GenServer instance
     gs_inst = gs.GenServer()
-    FrTest("PARENT", gs_inst, "A", "B", route_manager).run()
+    # Kick off a test 
+    FrTest("PARENT", gs_inst, ar_task_ids, mp_manager, d_process_qs).run()
 
 # Run child instance tests
-def run_child_process(route_manager):
-    router = routing.Routing(route_manager)
-    router.add_route("CHILD", ["C", "D"])
+def run_child_process(ar_task_ids, d_process_qs, mp_manager):
+    # Initialise a router
+    router = routing.Routing(mp_manager)
+    # Add tasks for the main process
+    router.add_route("CHILD", ar_task_ids)
+    # Make a GenServer instance
     gs_inst = gs.GenServer()
-    q1 = mp.Queue()
-    q2 = mp.Queue()
-    p = mp.Process(target=FrTest("CHILD", gs_inst, "C", "D", route_manager, {"PARENT": q1, "CHILD": q2}).run)
+    # Kick off a test
+    p = mp.Process(target=FrTest("CHILD", gs_inst, ar_task_ids, mp_manager, d_process_qs).run)
     p.start()
     
 # Test entry point  
 if __name__ == '__main__':
-    # Make the one and only shared routing manager to store routes in a dict
-    route_manager = mp.Manager().dict()
-    # Kick off a parent and child process
-    t1 = threading.Thread(target=run_parent_process, args=(route_manager,))
+    # Make the one and only shared dictionary
+    mp_manager = mp.Manager().dict()
+    
+    # Make multiprocessor.Queues between each process
+    # Only one q required for the two processes
+    q = mp.Queue()
+    
+    # Kick off a parent process
+    # Parent talks to the child on one end of q
+    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], {"CHILD": q}, mp_manager))
     t1.start()
-    t2 = threading.Thread(target=run_child_process, args=(route_manager,))
-    # Wait for completion
+    # and a child process
+    # Child talks to the parent on other end of q
+    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], {"PARENT": q}, mp_manager))
     t2.start()
+    
+    # Wait for completion
     t1.join()
     t2.join()
 
