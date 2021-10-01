@@ -55,7 +55,7 @@ class FrTest:
         self.__qs = q
         
         # Make a routing manager
-        self.__router = routing.Routing(mp_manager)
+        self.__router = routing.Routing(mp_manager, self.__qs)
     
     # Entry point for process
     def run(self):
