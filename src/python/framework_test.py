@@ -76,6 +76,9 @@ class FrTest:
         # Make a GenServer instance to manage gen servers in this process
         self.__gs_inst = gs.GenServer(td_man, router)
     
+        # Wait for everything to complete routes - should be an S4 here
+        sleep(1)
+        
         # Print context
         print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
         
@@ -237,11 +240,11 @@ if __name__ == '__main__':
     # Kick off a parent process
     # Parent talks to the child on one end of q
     # ***Q does need process dest so it can be matched up
-    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], [q,], mp_manager))
+    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], {"CHILD": q}, mp_manager))
     t1.start()
     # and a child process
     # Child talks to the parent on other end of q
-    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], [q,], mp_manager))
+    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], {"PARENT": q}, mp_manager))
     t2.start()
     
     # Wait for completion

@@ -49,7 +49,7 @@ class FwdServer(threading.Thread):
         
     def run(self):
         while not self.__term:
-            for q in self.__qs:
+            for q in self.__qs.values():
                 try:
                     item = q.get(block=False)
                     # Process message

@@ -74,16 +74,19 @@ class Routing:
         return r, self.__qs
     
     def process_for_task(self, task):
+        print("process_for_task ", task)
         r = None
         self.__lk.acquire()
         # Can't directly iterate a proxy
         # This is a simple work round as the dict is small
         routes = copy.deepcopy(self.__routes)
+        print("Routes ", routes)
         for process in routes:
             if task in routes[process]:
                 r = process
                 break
         self.__lk.release()
+        print("Queues ", self.__qs)
         if r in self.__qs:
             return r, self.__qs[process]
         else:
