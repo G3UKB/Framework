@@ -38,9 +38,10 @@ import td_manager
 # The forwarding task
 class FwdServer(threading.Thread):
     
-    def __init__(self, td_man):
+    def __init__(self, td_man, qs):
         super(FwdServer, self).__init__()
         self.__td_man = td_man
+        self.__qs = qs
         self.__term = False
         
     def terminate(self):
@@ -48,12 +49,12 @@ class FwdServer(threading.Thread):
         
     def run(self):
         while not self.__term:
-            for q in qs:
+            for q in self.__qs:
                 try:
-                    item = self.__q.get(block=False)
+                    item = q.get(block=False)
                     # Process message
                     self.__process(item)
-                except Queue.Empty:
+                except queue.Empty:
                     continue
             sleep(0.05)
         print("FwdServer terminating...")

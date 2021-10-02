@@ -34,6 +34,7 @@ from enum import Enum
 # Application imports
 import gen_server as gs
 import pub_sub as ps
+import td_manager
 import routing
 import forwarder
 
@@ -46,20 +47,37 @@ import forwarder
 
 class FrTest:
 
-    def __init__(self, name, gs_inst, ar_task_ids, router):
+    def __init__(self, name, ar_task_ids, qs, mp_manager):
         
         # Save params
         self.__name = name
-        self.__gs_inst = gs_inst
-        self.GS1 = ar_task_ids[0]
-        self.GS2 = ar_task_ids[1]
-        self.__router = router
+        self.__tid = ar_task_ids
+        self.__qs = qs
+        self.__mp_manager = mp_manager
         
     # Entry point for process
     def run(self):
         
+        self.GS1 = self.__tid[0]
+        self.GS2 = self.__tid[1]
+
+        # Make a task data manager
+        td_man = td_manager.TdManager()
+    
+        # Make and run a forward server
+        fwds = forwarder.FwdServer(td_man, self.__qs)
+        fwds.start()
+    
+        # Make a router
+        router = routing.Routing(self.__mp_manager, self.__qs)
+        # Add routes for this process
+        router.add_route(self.__name, self.__tid)
+        
+        # Make a GenServer instance to manage gen servers in this process
+        self.__gs_inst = gs.GenServer(td_man, router)
+    
         # Print context
-        print("Context: ", os.getpid(), self.__name, self.__router.get_routes(), self.__qs, sep=' ')
+        print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
         
         # Make 2 gen-servers
         self.__gs_inst.server_new(self.GS1, self.gs1_dispatch)
@@ -103,6 +121,8 @@ class FrTest:
         
         # Terminate servers
         sleep(1)
+        fwds.terminate()
+        fwds.join()
         self.__gs_inst.server_term_all()
         
     def main_dispatch(self, msg):
@@ -191,26 +211,14 @@ class FrTest:
                 print("%s [unknown message %s]" % (self.GS2, msg))
     
 # Run parent instance tests
-def run_parent_process(ar_task_ids, d_process_qs, td_man, mp_manager):
-    # Initialise a router
-    router = routing.Routing(mp_manager)
-    # Add tasks for the main process
-    router.add_route("PARENT", ar_task_ids)
-    # Make a GenServer instance
-    gs_inst = gs.GenServer(td_man, router)
+def run_parent_process(ar_task_ids, d_process_qs, mp_manager):
     # Kick off a test 
-    FrTest("PARENT", gs_inst, ar_task_ids, router).run()
+    FrTest("PARENT", ar_task_ids, d_process_qs, mp_manager).run()
 
 # Run child instance tests
-def run_child_process(ar_task_ids, d_process_qs, td_man, mp_manager):
-    # Initialise a router
-    router = routing.Routing(mp_manager, d_process_qs)
-    # Add tasks for the main process
-    router.add_route("CHILD", ar_task_ids)
-    # Make a GenServer instance
-    gs_inst = gs.GenServer(td_man, router)
+def run_child_process(ar_task_ids, d_process_qs, mp_manager):
     # Kick off a test
-    p = mp.Process(target=FrTest("CHILD", gs_inst, ar_task_ids, router).run)
+    p = mp.Process(target=FrTest("CHILD", ar_task_ids, d_process_qs, mp_manager).run)
     p.start()
     
 # Test entry point  
@@ -222,20 +230,13 @@ if __name__ == '__main__':
     # Only one q required for the two processes
     q = mp.Queue()
     
-    # Make a task data manager
-    td_man = td_manager.TdManager()
-
-    # Make and run a forward server
-    fwds = forwarder.FwdServer(td_man)
-    fwds.start()
-    
     # Kick off a parent process
     # Parent talks to the child on one end of q
-    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], {"CHILD": q}, td_man, mp_manager))
+    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], [q,], mp_manager))
     t1.start()
     # and a child process
     # Child talks to the parent on other end of q
-    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], {"PARENT": q},td_man,  mp_manager))
+    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], [q,], mp_manager))
     t2.start()
     
     # Wait for completion

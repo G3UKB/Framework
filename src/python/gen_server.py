@@ -123,7 +123,6 @@ import queue
 from time import sleep
 
 # Application imports
-import td_manager
 
 # ====================================================================
 # PUBLIC
@@ -140,7 +139,7 @@ class GenServer:
         # Assign a queue
         q = queue.Queue()
         # Create a new thrd-server task
-        thrd_server = ThrdServer(name, self.__td_man)
+        thrd_server = ThrdServer(name, self.__td_man, q)
             
         # Add to the task registry
         self.__td_man.store_task_ref(name, [thrd_server, dispatcher, q])
@@ -241,10 +240,11 @@ class GenServer:
 # The gen-server thread task
 class ThrdServer(threading.Thread):
     
-    def __init__(self, name, td_man):
+    def __init__(self, name, td_man, q):
         super(ThrdServer, self).__init__()
         self.__name = name
         self.__td_man = td_man
+        self.__q = q
         self.__term = False
         
     def terminate(self):
