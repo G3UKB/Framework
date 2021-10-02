@@ -167,7 +167,7 @@ class GenServer:
         item = self.__td_man.get_task_ref(name)
         if item == None:
             # Which process is the message destination
-            q = self.__get_target(name)
+            q = self.get_target(name)
             if q != None:
                 # Forward the message to the process q
                 msg = [name, message]
@@ -192,7 +192,7 @@ class GenServer:
         item = self.__td_man.get_task_ref(name)
         if item == None:
             # Which process is the message destination
-            q = self.__get_target(name)
+            q = self.get_target(name)
             if q != None:
                 # Forward the message to the process q
                 msg = [name, message]

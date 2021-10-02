@@ -41,6 +41,8 @@ from time import sleep
     process and then each Process can create an instance of Routing to provide the convienience access methods.
 """
 
+import copy
+
 class Routing:
     
     def __init__(self, router, qs):
@@ -74,8 +76,11 @@ class Routing:
     def process_for_task(self, task):
         r = None
         self.__lk.acquire()
-        for process in self.__routes:
-            if task in self.__routes[process]:
+        # Can't directly iterate a proxy
+        # This is a simple work round as the dict is small
+        routes = copy.deepcopy(self.__routes)
+        for process in routes:
+            if task in routes[process]:
                 r = process
                 break
         self.__lk.release()

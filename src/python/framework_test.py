@@ -93,6 +93,10 @@ class FrTest:
         self.__gs_inst.server_msg(self.GS1, ["Message 2 to %s" % self.GS1])
         self.__gs_inst.server_msg(self.GS2, ["Message 2 to %s" % self.GS2])
         
+        # Try message to C
+        self.__gs_inst.server_msg("A", ["Try to A from MAIN"])
+        self.__gs_inst.server_msg("C", ["Try to C from MAIN"])
+        
         # Retrieve messages for us
         msg = self.__gs_inst.server_msg_get("MAIN")
         while msg != None:
@@ -232,6 +236,7 @@ if __name__ == '__main__':
     
     # Kick off a parent process
     # Parent talks to the child on one end of q
+    # ***Q does need process dest so it can be matched up
     t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], [q,], mp_manager))
     t1.start()
     # and a child process
