@@ -35,6 +35,7 @@ from enum import Enum
 import gen_server as gs
 import pub_sub as ps
 import routing
+import forwarder
 
 # ====================================================================
 # Test code
@@ -45,18 +46,15 @@ import routing
 
 class FrTest:
 
-    def __init__(self, name, gs_inst, ar_task_ids, mp_manager, qs={}):
+    def __init__(self, name, gs_inst, ar_task_ids, router):
         
         # Save params
         self.__name = name
         self.__gs_inst = gs_inst
         self.GS1 = ar_task_ids[0]
         self.GS2 = ar_task_ids[1]
-        self.__qs = q
+        self.__router = router
         
-        # Make a routing manager
-        self.__router = routing.Routing(mp_manager, self.__qs)
-    
     # Entry point for process
     def run(self):
         
@@ -193,26 +191,26 @@ class FrTest:
                 print("%s [unknown message %s]" % (self.GS2, msg))
     
 # Run parent instance tests
-def run_parent_process(ar_task_ids, d_process_qs, mp_manager):
+def run_parent_process(ar_task_ids, d_process_qs, td_man, mp_manager):
     # Initialise a router
     router = routing.Routing(mp_manager)
     # Add tasks for the main process
     router.add_route("PARENT", ar_task_ids)
     # Make a GenServer instance
-    gs_inst = gs.GenServer()
+    gs_inst = gs.GenServer(td_man, router)
     # Kick off a test 
-    FrTest("PARENT", gs_inst, ar_task_ids, mp_manager, d_process_qs).run()
+    FrTest("PARENT", gs_inst, ar_task_ids, router).run()
 
 # Run child instance tests
-def run_child_process(ar_task_ids, d_process_qs, mp_manager):
+def run_child_process(ar_task_ids, d_process_qs, td_man, mp_manager):
     # Initialise a router
-    router = routing.Routing(mp_manager)
+    router = routing.Routing(mp_manager, d_process_qs)
     # Add tasks for the main process
     router.add_route("CHILD", ar_task_ids)
     # Make a GenServer instance
-    gs_inst = gs.GenServer()
+    gs_inst = gs.GenServer(td_man, router)
     # Kick off a test
-    p = mp.Process(target=FrTest("CHILD", gs_inst, ar_task_ids, mp_manager, d_process_qs).run)
+    p = mp.Process(target=FrTest("CHILD", gs_inst, ar_task_ids, router).run)
     p.start()
     
 # Test entry point  
@@ -224,13 +222,20 @@ if __name__ == '__main__':
     # Only one q required for the two processes
     q = mp.Queue()
     
+    # Make a task data manager
+    td_man = td_manager.TdManager()
+
+    # Make and run a forward server
+    fwds = forwarder.FwdServer(td_man)
+    fwds.start()
+    
     # Kick off a parent process
     # Parent talks to the child on one end of q
-    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], {"CHILD": q}, mp_manager))
+    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], {"CHILD": q}, td_man, mp_manager))
     t1.start()
     # and a child process
     # Child talks to the parent on other end of q
-    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], {"PARENT": q}, mp_manager))
+    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], {"PARENT": q},td_man,  mp_manager))
     t2.start()
     
     # Wait for completion

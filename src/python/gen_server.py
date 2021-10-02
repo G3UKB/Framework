@@ -130,19 +130,17 @@ import td_manager
 # API
 
 class GenServer:
-    # Class variable for the task data manager
-    td_man = td_manager.TdManager()
-    
-    def __init__(self):
-        pass
-    
+   
+    def __init__(self, td_man, router):
+        self.__router = router
+        self.__td_man = td_man
+
     def server_new(self, name, dispatcher):
         
-        self.__td_man = GenServer.td_man
         # Assign a queue
         q = queue.Queue()
-        # Create a new gen-server
-        thrd_server = ThrdServer(name, dispatcher, q, self.__td_man)
+        # Create a new thrd-server task
+        thrd_server = ThrdServer(name, self.__td_man)
             
         # Add to the task registry
         self.__td_man.store_task_ref(name, [thrd_server, dispatcher, q])
@@ -168,7 +166,15 @@ class GenServer:
     
     def server_msg(self, name, message):
         item = self.__td_man.get_task_ref(name)
-        if item != None:
+        if item == None:
+            # Which process is the message destination
+            q = self.__get_target(name)
+            if q != None:
+                # Forward the message to the process q
+                msg = [name, message]
+                q.put(msg)
+        else:
+            # For this process
             msg = [name, message]
             _, d, q = item
             q.put(msg)
@@ -185,7 +191,15 @@ class GenServer:
             
     def server_response(self, name, response):
         item = self.__td_man.get_task_ref(name)
-        if item != None:
+        if item == None:
+            # Which process is the message destination
+            q = self.__get_target(name)
+            if q != None:
+                # Forward the message to the process q
+                msg = [name, message]
+                q.put(msg)
+        else:
+            # Local dispatch
             msg = [name, response]
             _, d, q = item
             q.put(msg)
@@ -208,17 +222,28 @@ class GenServer:
         # Remove from task registry
        self.__td_man.rm_task_ref( name )
 
+    def get_target(self, name):
+        # Which process is the message destination
+        process, q = self.__router.process_for_task(name)
+        if process == None:
+            # Not known
+            print("GenServer - destination %s not found in router table!" % (name))
+            return None
+        elif q == None:
+            print("GenServer - destination %s found but no associated queue!" % (name))
+            return None
+        else:
+            return q
+        
 # ====================================================================
 # PRIVATE
-# The gen-server thread task
 
+# The gen-server thread task
 class ThrdServer(threading.Thread):
     
-    def __init__(self, name, dispatcher, q, td_man):
+    def __init__(self, name, td_man):
         super(ThrdServer, self).__init__()
         self.__name = name
-        self.__dispatcher = dispatcher
-        self.__q = q
         self.__td_man = td_man
         self.__term = False
         
@@ -242,7 +267,7 @@ class ThrdServer(threading.Thread):
         # Lookup the destination
         item = self.__td_man.get_task_ref(name)
         if item == None:
-            # Oops, no destination
+            # No destination  
             print("GenServer - destination %s not found!" % (name))
         else:
             # Dispatch
