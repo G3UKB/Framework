@@ -66,7 +66,10 @@ class TdManager:
         refs = self.__td.values()
         self.release()
         return refs
-        
+    
+    def get_raw(self):
+        return self.__td
+    
     def rm_task_ref(self, name):
         self.lock()
         if name in  self.__td:
