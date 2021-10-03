@@ -239,7 +239,7 @@ if __name__ == '__main__':
     
     # Kick off a parent process
     # Parent talks to the child on one end of q
-    # ***Q does need process dest so it can be matched up
+    # ***This is not main thread, don't thread it! It is a user thread though.
     t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], {"CHILD": q}, mp_manager))
     t1.start()
     # and a child process
