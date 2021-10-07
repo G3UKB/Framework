@@ -47,13 +47,14 @@ import forwarder
 
 class FrTest:
 
-    def __init__(self, name, ar_task_ids, qs, mp_manager):
+    def __init__(self, name, ar_task_ids, qs, mp_dict, mp_event):
         
         # Save params
         self.__name = name
         self.__tid = ar_task_ids
         self.__qs = qs
-        self.__mp_manager = mp_manager
+        self.__mp_dict = mp_dict
+        self.__mp_event = mp_event
         
     # Entry point for process
     def run(self):
@@ -69,15 +70,12 @@ class FrTest:
         fwds.start()
     
         # Make a router
-        router = routing.Routing(self.__mp_manager, self.__qs)
+        router = routing.Routing(self.__mp_dict, self.__qs)
         # Add routes for this process
         router.add_route(self.__name, self.__tid)
         
         # Make a GenServer instance to manage gen servers in this process
         self.__gs_inst = gs.GenServer(td_man, router)
-    
-        # Wait for everything to complete routes - should be an S4 here
-        sleep(1)
         
         # Print context
         #print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
@@ -90,33 +88,40 @@ class FrTest:
         q = queue.Queue()
         self.__gs_inst.server_reg(self.__name, None, self.main_dispatch, q)
         
+        # Wait for ready
+        print(self.__name, " waiting")
+        self.__mp_event.wait()
+        print(self.__name, " proceeding")
+        
         # Send message to A and B from main thread
-        self.__gs_inst.server_msg(self.GS1, ["Message 1 to %s" % self.GS1])
-        self.__gs_inst.server_msg(self.GS2, ["Message 1 to %s" % self.GS2])
-        self.__gs_inst.server_msg(self.GS1, ["Message 2 to %s" % self.GS1])
-        self.__gs_inst.server_msg(self.GS2, ["Message 2 to %s" % self.GS2])
+        #self.__gs_inst.server_msg(self.GS1, ["Message 1 to %s" % self.GS1])
+        #self.__gs_inst.server_msg(self.GS2, ["Message 1 to %s" % self.GS2])
+        #self.__gs_inst.server_msg(self.GS1, ["Message 2 to %s" % self.GS1])
+        #self.__gs_inst.server_msg(self.GS2, ["Message 2 to %s" % self.GS2])
         
         # Try message to C
-        if self.GS1 == 'A':
+        if self.__name == "PARENT":
+            # This is A and B servers so try a send to C
             self.__gs_inst.server_msg("C", ["Interprocess to C from %s" % self.__name])
-        else:
-            self.__gs_inst.server_msg("A", ["Interprocess to A from %s" % self.__name])
+        #else:
+        #    # This is B and C severs so try a send to A
+        #    self.__gs_inst.server_msg("A", ["Interprocess to A from %s" % self.__name])
         
         # Retrieve messages for us
-        msg = self.__gs_inst.server_msg_get(self.__name)
-        while msg != None:
-            print(msg)
-            msg = self.__gs_inst.server_msg_get(self.__name)
+        #msg = self.__gs_inst.server_msg_get(self.__name)
+        #while msg != None:
+        #    print(msg)
+        #    msg = self.__gs_inst.server_msg_get(self.__name)
         
         # Send message to A and B from main thread that require a response
-        self.__gs_inst.server_msg(self.GS1, [self.__name, "Message to %s expects response" % self.GS1])
-        self.__gs_inst.server_msg(self.GS2, [self.__name, "Message to %s expects response" % self.GS2])
+        #self.__gs_inst.server_msg(self.GS1, [self.__name, "Message to %s expects response" % self.GS1])
+        #self.__gs_inst.server_msg(self.GS2, [self.__name, "Message to %s expects response" % self.GS2])
         
         # Retrieve responses for us
-        resp = self.__gs_inst.server_response_get(self.__name)
-        while resp != None:
-            print(resp)
-            resp = self.__gs_inst.server_response_get(self.__name)
+        #resp = self.__gs_inst.server_response_get(self.__name)
+        #while resp != None:
+        #    print(resp)
+        #    resp = self.__gs_inst.server_response_get(self.__name)
         
         # Subscribe A & B to a topic
         #ps.ps_subscribe( "GS1", "TOPIC-1")
@@ -223,34 +228,44 @@ class FrTest:
                 print("%s [unknown message %s]" % (self.GS2, msg))
     
 # Run parent instance tests
-def run_parent_process(ar_task_ids, d_process_qs, mp_manager):
+def run_parent_process(ar_task_ids, d_process_qs, mp_dict, mp_event):
     # Kick off a test 
-    FrTest("PARENT", ar_task_ids, d_process_qs, mp_manager).run()
+    FrTest("PARENT", ar_task_ids, d_process_qs, mp_dict, mp_event).run()
 
 # Run child instance tests
-def run_child_process(ar_task_ids, d_process_qs, mp_manager):
+def run_child_process(ar_task_ids, d_process_qs, mp_dict, mp_event):
     # Kick off a test
-    p = mp.Process(target=FrTest("CHILD", ar_task_ids, d_process_qs, mp_manager).run)
+    p = mp.Process(target=FrTest("CHILD", ar_task_ids, d_process_qs, mp_dict, mp_event).run)
     p.start()
     
 # Test entry point  
 if __name__ == '__main__':
     # Make the one and only shared dictionary
-    mp_manager = mp.Manager().dict()
+    mp_manager = mp.Manager()
+    mp_dict = mp_manager.dict()
+    mp_event = mp_manager.Event()
     
     # Make multiprocessor.Queues between each process
-    # Only one q required for the two processes
-    q = mp.Queue()
+    # There is a pair of queues for each communication channel
+    # The first in the pair the listens for messages from 'name'.
+    # The second sends messages to 'name'.
+    q1 = mp.Queue()
+    q2 = mp.Queue()
     
     # Kick off a parent process
-    # Parent talks to the child on one end of q
-    # ***This is not main thread, don't thread it! It is a user thread though.
-    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], {"CHILD": q}, mp_manager))
+    # Parent listens
+    # Start a user thread in the main process
+    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], {"CHILD": (q1,q2)}, mp_dict, mp_event))
     t1.start()
+    sleep(2)
     # and a child process
     # Child talks to the parent on other end of q
-    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], {"PARENT": q}, mp_manager))
+    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], {"PARENT": (q2, q1)}, mp_dict, mp_event))
     t2.start()
+    sleep(1)
+    
+    # Ready to go
+    mp_event.set()
     
     # Wait for completion
     t1.join()

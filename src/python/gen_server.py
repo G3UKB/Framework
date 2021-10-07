@@ -166,6 +166,7 @@ class GenServer:
     def server_msg(self, name, message):
         item = self.__td_man.get_task_ref(name)
         if item == None:
+            print("Item not present ", name)
             # Which process is the message destination
             q = self.get_target(name)
             if q != None:
@@ -223,7 +224,9 @@ class GenServer:
 
     def get_target(self, name):
         # Which process is the message destination
-        process, q = self.__router.process_for_task(name)
+        print("get_target ", name, self.__router.process_for_task(name))
+        process, (_, q) = self.__router.process_for_task(name)
+        print("get_target ", process, q)
         if process == None:
             # Not known
             print("GenServer - destination %s not found in router table!" % (name))

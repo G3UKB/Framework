@@ -49,7 +49,7 @@ class FwdServer(threading.Thread):
         
     def run(self):
         while not self.__term:
-            for q in self.__qs.values():
+            for (q, _) in self.__qs.values():
                 try:
                     item = q.get(block=False)
                     # Process message
@@ -64,7 +64,7 @@ class FwdServer(threading.Thread):
         # [name, [*] | [sender, [*]]]
         name, data = msg
         # Lookup the destination
-        print("RAW: ", name, " :", self.__td_man.get_raw())
+        #print("RAW: ", name, " :", self.__td_man.get_raw())
         item = self.__td_man.get_task_ref(name)
         if item == None:
             # No destination 
