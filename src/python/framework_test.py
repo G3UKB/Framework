@@ -94,34 +94,34 @@ class FrTest:
         print(self.__name, " proceeding")
         
         # Send message to A and B from main thread
-        #self.__gs_inst.server_msg(self.GS1, ["Message 1 to %s" % self.GS1])
-        #self.__gs_inst.server_msg(self.GS2, ["Message 1 to %s" % self.GS2])
-        #self.__gs_inst.server_msg(self.GS1, ["Message 2 to %s" % self.GS1])
-        #self.__gs_inst.server_msg(self.GS2, ["Message 2 to %s" % self.GS2])
+        self.__gs_inst.server_msg(self.GS1, ["Message 1 to %s" % self.GS1])
+        self.__gs_inst.server_msg(self.GS2, ["Message 1 to %s" % self.GS2])
+        self.__gs_inst.server_msg(self.GS1, ["Message 2 to %s" % self.GS1])
+        self.__gs_inst.server_msg(self.GS2, ["Message 2 to %s" % self.GS2])
         
         # Try message to C
         if self.__name == "PARENT":
             # This is A and B servers so try a send to C
             self.__gs_inst.server_msg("C", ["Interprocess to C from %s" % self.__name])
-        #else:
-        #    # This is B and C severs so try a send to A
-        #    self.__gs_inst.server_msg("A", ["Interprocess to A from %s" % self.__name])
+        else:
+            # This is B and C severs so try a send to A
+            self.__gs_inst.server_msg("A", ["Interprocess to A from %s" % self.__name])
         
         # Retrieve messages for us
-        #msg = self.__gs_inst.server_msg_get(self.__name)
-        #while msg != None:
-        #    print(msg)
-        #    msg = self.__gs_inst.server_msg_get(self.__name)
+        msg = self.__gs_inst.server_msg_get(self.__name)
+        while msg != None:
+            print(msg)
+            msg = self.__gs_inst.server_msg_get(self.__name)
         
         # Send message to A and B from main thread that require a response
-        #self.__gs_inst.server_msg(self.GS1, [self.__name, "Message to %s expects response" % self.GS1])
-        #self.__gs_inst.server_msg(self.GS2, [self.__name, "Message to %s expects response" % self.GS2])
+        self.__gs_inst.server_msg(self.GS1, [self.__name, "Message to %s expects response" % self.GS1])
+        self.__gs_inst.server_msg(self.GS2, [self.__name, "Message to %s expects response" % self.GS2])
         
         # Retrieve responses for us
-        #resp = self.__gs_inst.server_response_get(self.__name)
-        #while resp != None:
-        #    print(resp)
-        #    resp = self.__gs_inst.server_response_get(self.__name)
+        resp = self.__gs_inst.server_response_get(self.__name)
+        while resp != None:
+            print(resp)
+            resp = self.__gs_inst.server_response_get(self.__name)
         
         # Subscribe A & B to a topic
         #ps.ps_subscribe( "GS1", "TOPIC-1")
@@ -179,6 +179,10 @@ class FrTest:
                         self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[2]" % (self.GS2, self.GS1)] )
                     case MSGS.MSG3.value:
                         print("%s-%s [1]" % (self.GS2, self.GS1))
+                    case "Interprocess to A from CHILD":
+                        print("Got - Interprocess to A from CHILD")
+                    case "Interprocess to C from PARENT":
+                        print("Got - Interprocess to C from PARENT")
                     case MSGS.MSG4.value:
                         print("%s-%s [2]" % (self.GS2, self.GS1))
                     case "Publish to TOPIC-1":
