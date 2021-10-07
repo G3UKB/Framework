@@ -64,7 +64,7 @@ class FwdServer(threading.Thread):
         # [name, [*] | [sender, [*]]]
         name, data = msg
         # Lookup the destination
-        print(name, " :", self.__td_man.get_raw())
+        print("RAW: ", name, " :", self.__td_man.get_raw())
         item = self.__td_man.get_task_ref(name)
         if item == None:
             # No destination 

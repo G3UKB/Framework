@@ -80,15 +80,15 @@ class FrTest:
         sleep(1)
         
         # Print context
-        print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
+        #print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
         
         # Make 2 gen-servers
         self.__gs_inst.server_new(self.GS1, self.gs1_dispatch)
         self.__gs_inst.server_new(self.GS2, self.gs2_dispatch)
         
-        # Regiater main thread for our process
+        # Regiater our thread for our process
         q = queue.Queue()
-        self.__gs_inst.server_reg("MAIN", None, self.main_dispatch, q)
+        self.__gs_inst.server_reg(self.__name, None, self.main_dispatch, q)
         
         # Send message to A and B from main thread
         self.__gs_inst.server_msg(self.GS1, ["Message 1 to %s" % self.GS1])
@@ -97,24 +97,26 @@ class FrTest:
         self.__gs_inst.server_msg(self.GS2, ["Message 2 to %s" % self.GS2])
         
         # Try message to C
-        self.__gs_inst.server_msg("A", ["Try to A from MAIN"])
-        self.__gs_inst.server_msg("C", ["Try to C from MAIN"])
+        if self.GS1 == 'A':
+            self.__gs_inst.server_msg("C", ["Interprocess to C from %s" % self.__name])
+        else:
+            self.__gs_inst.server_msg("A", ["Interprocess to A from %s" % self.__name])
         
         # Retrieve messages for us
-        msg = self.__gs_inst.server_msg_get("MAIN")
+        msg = self.__gs_inst.server_msg_get(self.__name)
         while msg != None:
             print(msg)
-            msg = self.__gs_inst.server_msg_get("MAIN")
+            msg = self.__gs_inst.server_msg_get(self.__name)
         
         # Send message to A and B from main thread that require a response
-        self.__gs_inst.server_msg(self.GS1, ["MAIN", "Message to %s expects response" % self.GS1])
-        self.__gs_inst.server_msg(self.GS2, ["MAIN", "Message to %s expects response" % self.GS2])
+        self.__gs_inst.server_msg(self.GS1, [self.__name, "Message to %s expects response" % self.GS1])
+        self.__gs_inst.server_msg(self.GS2, [self.__name, "Message to %s expects response" % self.GS2])
         
         # Retrieve responses for us
-        resp = self.__gs_inst.server_response_get("MAIN")
+        resp = self.__gs_inst.server_response_get(self.__name)
         while resp != None:
             print(resp)
-            resp = self.__gs_inst.server_response_get("MAIN")
+            resp = self.__gs_inst.server_response_get(self.__name)
         
         # Subscribe A & B to a topic
         #ps.ps_subscribe( "GS1", "TOPIC-1")
@@ -133,19 +135,22 @@ class FrTest:
         self.__gs_inst.server_term_all()
         
     def main_dispatch(self, msg):
+        class MSGS(Enum):
+            MSG1 = "Message 1 to %s" % (self.__name)
+            MSG2 = "Message 2 to %s" % (self.__name)
         match msg:
             case [data]:
                 match data:
-                    case "Message 1 to MAIN":
-                        print("MAIN Message 1 ", data)
-                    case "Message 2 to MAIN":
-                        print("MAIN Message 2 ", data)
+                    case MSGS.MSG1.value:
+                        print("%s Message 1 ", (self.__name, data))
+                    case MSGS.MSG2.value:
+                        print("%s Message 2 ", (self.__name, data))
             # Does message need a response
             case [sender, data]:
-                print("MAIN [%s, %s] " % (sender, data))
-                self.__gs_inst.server_response( sender, "Response to %s from MAIN" % (sender) )
+                print("%s [%s, %s] " % (self.__name, sender, data))
+                self.__gs_inst.server_response( sender, "Response to %s from %s" % (sender, self.__name) )
             case _:
-                print("MAIN [unknown message %s]" % (msg)) 
+                print("%s [unknown message %s]" % (self.__name, msg)) 
     
     def gs1_dispatch(self, msg):
         class MSGS(Enum):
@@ -161,11 +166,11 @@ class FrTest:
                 match data:
                     case MSGS.MSG1.value:
                         print("%s - Message 1 [%s]" % (self.GS1, str(data)))
-                        self.__gs_inst.server_msg( "MAIN", ["Message to MAIN from %s[1]" % self.GS1] )
+                        self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[1]" % (self.__name, self.GS1)] )
                         self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[1]" % (self.GS2, self.GS1)] )
                     case MSGS.MSG2.value:
                         print("%s - Message 2 [%s]" % (self.GS1, str(data)))
-                        self.__gs_inst.server_msg( "MAIN", ["Message to MAIN from %s[2]" % self.GS1] )
+                        self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[2]" % (self.__name, self.GS1)] )
                         self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[2]" % (self.GS2, self.GS1)] )
                     case MSGS.MSG3.value:
                         print("%s-%s [1]" % (self.GS2, self.GS1))
@@ -196,11 +201,11 @@ class FrTest:
                 match data:
                     case MSGS.MSG1.value:
                         print("%s Message 1 [%s]" % (self.GS2, str(data)))
-                        self.__gs_inst.server_msg( "MAIN", ["Message to MAIN from %s[1]" % self.GS2] )
+                        self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[1]" % (self.__name, self.GS2)] )
                         self.__gs_inst.server_msg( self.GS1, ["Message to %s from %s[1]" % (self.GS1, self.GS2)] )
                     case MSGS.MSG2.value:
                         print("%s Message 2 [%s]" % (self.GS2, str(data)))
-                        self.__gs_inst.server_msg( "MAIN", ["Message to MAIN from %s[2]" % self.GS2] )
+                        self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[2]" % (self.__name, self.GS2)] )
                         self.__gs_inst.server_msg( self.GS1, ["Message to %s from %s[2]" % (self.GS1, self.GS2)] )
                     case MSGS.MSG3.value:
                         print("%s-%s [1]" % (self.GS1, self.GS2))
