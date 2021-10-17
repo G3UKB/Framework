@@ -75,6 +75,9 @@ class FrTest:
         # Add routes for this process
         router.add_route(self.__name, self.__tid)
         
+        # Make an IPC proc
+        # Sytartit with the ports to listen on.
+        
         # Add IMC routes
         router.add_route("IMC", self.__imc)
         
@@ -262,6 +265,7 @@ if __name__ == '__main__':
     
     # Kick off a parent process
     # Start a user thread in the main process
+    # Add ports into IPC
     t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], [["E","192,168.1.200"], ["F","192,168.1.201"]], {"CHILD": (q1,q2)}, mp_dict, mp_event))
     t1.start()
     sleep(2)
