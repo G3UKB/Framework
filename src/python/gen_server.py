@@ -223,6 +223,7 @@ class GenServer:
 
     def get_target(self, name):
         # Which process is the message destination
+        print(name, self.__router.process_for_task(name))
         process, (_, q) = self.__router.process_for_task(name)
         if process == None:
             # Not known
