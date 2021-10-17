@@ -222,9 +222,23 @@ class GenServer:
        self.__td_man.rm_task_ref( name )
 
     def get_target(self, name):
-        # Which process is the message destination
-        print(name, self.__router.process_for_task(name))
-        process, (_, q) = self.__router.process_for_task(name)
+        # Which process or machine is the message destination
+        process, (_, data) = self.__router.process_for_task(name)
+        if process != None:
+            if data != None:
+                # We have a valid route on this machine
+                return data
+                # return 'WMC', data 
+        else:
+            # Check IPC
+            ipc_routes = self.__router.get_route("IPC")
+            # Of the form [[task,IP], [...]]
+            for item in data:
+                if item[0] == name:
+                    # Found task, return IP
+                    return 'IMC', item[1]
+            
+        
         if process == None:
             # Not known
             print("GenServer - destination %s not found in router table!" % (name))
