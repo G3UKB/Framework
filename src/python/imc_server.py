@@ -24,6 +24,8 @@
 #
 
 # System imports
+import socket
+import pickle
 import threading
 from time import sleep
 
@@ -37,31 +39,54 @@ import td_manager
 # The imc task
 class ImcServer(threading.Thread):
     
-    def __init__(self, td_man, spec, q):
+    def __init__(self, td_man, desc, q):
         super(ImcServer, self).__init__()
         self.__td_man = td_man
-        self.__spec = spec
+        # desc is of the form
+        # [[["E", "F"],"192,168.1.200", 10000, 10001], [["G", "H"],"192,168.1.201", 10000, 10001]]
+        # We listen for remote data on the first port and dispatch it locally
+        # We listen for local requests on q to be sent to a remote destination and dispatch to the second port
         self.__q = q
+        self.__spec = desc
         self.__term = False
+        
+        # Open sockets
+        rlist = []
+        wlist = []
+        xlist = []
+        
+        for dest in spec:
+            task_id, ip_addr, out_port, in_port = dest
+            rlist.append(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+            #wlist.append(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+        index = 0
+        # Bind to all adapters on the receiving ports
+        for sock in rlist:
+            sock.bind(('', spec[index][2]))
         
     def terminate(self):
         self.__term = True
         
     def run(self):
         while not self.__term:
-            # Spec is of the form
-            # [["E","192,168.1.200", 10000], ["F","192,168.1.201", 10000]]
-            # We listen for remote data and dispatch it locally
-            # We listen for local requests to be sent to a remote destination
-            for (q, _) in self.__qs.values():
+            
+            # Wait for remote data
+            r, w, x = select.Select(rlist, wlist, xlist, 0.0)
+            if len(r) > 0:
+                # Data available
+                for s in r:
+                    data = s.read()
+                    # Dispatch locally
+                    self.__process(data)
+            else:
                 try:
-                    item = q.get(block=False)
-                    # Process message
-                    self.__process(item)
+                    item = self.__q.get(block=False)
+                    # Send message
+                    # ...
                 except queue.Empty:
                     continue
             sleep(0.05)
-        print("FwdServer terminating...")
+        print("ImcServer terminating...")
             
     def __process(self, msg):
         # A message is of this form but data is opaque to us
@@ -71,7 +96,7 @@ class ImcServer(threading.Thread):
         item = self.__td_man.get_task_ref(name)
         if item == None:
             # No destination 
-            print("FwdServer - destination %s not found!" % (name))
+            print("ImcServer - destination %s not found!" % (name))
         else:
             # Dispatch
             _, d, q = item

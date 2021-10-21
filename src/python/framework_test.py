@@ -37,6 +37,7 @@ import pub_sub as ps
 import td_manager
 import routing
 import forwarder
+import imc_server
 
 # ====================================================================
 # Test code
@@ -47,12 +48,13 @@ import forwarder
 
 class FrTest:
 
-    def __init__(self, name, ar_task_ids, ar_imc_ids, qs, mp_dict, mp_event):
+    def __init__(self, name, ar_task_ids, ar_imc_ids, imc_q, qs, mp_dict, mp_event):
         
         # Save params
         self.__name = name
         self.__tid = ar_task_ids
         self.__imc = ar_imc_ids
+        self.__imc_q = imc_q
         self.__qs = qs
         self.__mp_dict = mp_dict
         self.__mp_event = mp_event
@@ -75,8 +77,9 @@ class FrTest:
         # Add routes for this process
         router.add_route(self.__name, self.__tid)
         
-        # Make an IPC proc
-        # Sytartit with the ports to listen on.
+        # Make an IMC server
+        imc_inst = imc_server.ImcServer(self.__imc, self.__imc_q)
+        imc_inst.start()
         
         # Add IMC routes
         router.add_route("IMC", self.__imc)
@@ -239,14 +242,14 @@ class FrTest:
                 print("%s [unknown message %s]" % (self.GS2, msg))
     
 # Run parent instance tests
-def run_parent_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
+def run_parent_process(ar_task_ids, ar_imc_ids, imc_q, d_process_qs, mp_dict, mp_event):
     # Kick off a test 
-    FrTest("PARENT", ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run()
+    FrTest("PARENT", ar_task_ids, ar_imc_ids, imc_q, d_process_qs, mp_dict, mp_event).run()
 
 # Run child instance tests
-def run_child_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
+def run_child_process(ar_task_ids, ar_imc_ids, imc_q, d_process_qs, mp_dict, mp_event):
     # Kick off a test
-    p = mp.Process(target=FrTest("CHILD", ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
+    p = mp.Process(target=FrTest("CHILD", ar_task_ids, ar_imc_ids, imc_q, d_process_qs, mp_dict, mp_event).run)
     p.start()
     
 # Test entry point  
@@ -262,16 +265,17 @@ if __name__ == '__main__':
     # The second sends messages to 'name'.
     q1 = mp.Queue()
     q2 = mp.Queue()
+    q3 = queue.Queue()
     
     # Kick off a parent process
     # Start a user thread in the main process
     # Define the remote devices
-    imc = [["E","192,168.1.200", 10000], ["F","192,168.1.201", 10000]]
-    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], imc, {"CHILD": (q1,q2)}, mp_dict, mp_event))
+    imc = [q3, [["E", "F"],"192,168.1.200", 10000, 10001], [["G", "H"],"192,168.1.201", 10000, 10001]]
+    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], imc, q3, {"CHILD": (q1,q2)}, mp_dict, mp_event))
     t1.start()
     sleep(2)
     # and a child process
-    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], imc, {"PARENT": (q2, q1)}, mp_dict, mp_event))
+    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], imc, q3, {"PARENT": (q2, q1)}, mp_dict, mp_event))
     t2.start()
     sleep(1)
     
