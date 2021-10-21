@@ -265,12 +265,13 @@ if __name__ == '__main__':
     
     # Kick off a parent process
     # Start a user thread in the main process
-    # Add ports into IPC
-    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], [["E","192,168.1.200"], ["F","192,168.1.201"]], {"CHILD": (q1,q2)}, mp_dict, mp_event))
+    # Define the remote devices
+    imc = [["E","192,168.1.200", 10000], ["F","192,168.1.201", 10000]]
+    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], imc, {"CHILD": (q1,q2)}, mp_dict, mp_event))
     t1.start()
     sleep(2)
     # and a child process
-    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], [["E","192,168.1.200"], ["F","192,168.1.201"]], {"PARENT": (q2, q1)}, mp_dict, mp_event))
+    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], imc, {"PARENT": (q2, q1)}, mp_dict, mp_event))
     t2.start()
     sleep(1)
     
