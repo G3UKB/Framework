@@ -75,14 +75,16 @@ class ImcServer(threading.Thread):
             if len(r) > 0:
                 # Data available
                 for s in r:
-                    data = s.read()
+                    data, _ = s.recvfrom(512)
+                    data = pickle.loads(data)
                     # Dispatch locally
                     self.__process(data)
             else:
                 try:
-                    item = self.__q.get(block=False)
+                    data = self.__q.get(block=False)
+                    data = pickle.dumps(data)
                     # Send message
-                    # ...
+                    s.sendto(data, (dest[0], dest[2]))
                 except queue.Empty:
                     continue
             sleep(0.05)
