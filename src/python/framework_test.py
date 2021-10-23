@@ -32,6 +32,7 @@ from time import sleep
 from enum import Enum
 
 # Application imports
+from defs import *
 import gen_server as gs
 import pub_sub as ps
 import td_manager
@@ -75,16 +76,16 @@ class FrTest:
         # Make a router
         router = routing.Routing(self.__mp_dict, self.__qs)
         # Add routes for this process
-        for desc in self.__tid:
-            router.add_route(desc)
+        for desc in self.__tid[1]:
+            router.add_route(self.__tid[0], desc)
         
         # Make an IMC server
         imc_inst = imc_server.ImcServer(self.__imc, self.__imc_q)
         imc_inst.start()
         
         # Add IMC routes
-        for desc in self.__imc:
-            router.add_route(desc)
+        for desc in self.__imc[1]:
+            router.add_route(self.__imc[0], desc)
         
         # Make a GenServer instance to manage gen servers in this process
         self.__gs_inst = gs.GenServer(td_man, router)
@@ -276,13 +277,12 @@ if __name__ == '__main__':
     q3 = queue.Queue()
     q4 = queue.Queue()
     
-    # Kick off a parent process
-    # Start a user thread in the main process
+    # These should be in a config file and not hard coded!
     # Define the local processes
-    local_procs_1 = ["PARENT", [["A", "B"],]]
-    local_procs_2 = ["CHILD", [["C", "D"],]]
+    local_procs_1 = [LOCAL, [["PARENT", ["A", "B"]],]]
+    local_procs_2 = [LOCAL, [["CHILD", ["C", "D"]],]]
     # Define the remote processes
-    remote_procs = ["DEVICE-A", [["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", [["G", "H"],"192,168.1.201", 10000, 10001]]
+    remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10000, 10001]]
     # Define queues, note the process needs to know the processes it can communicate with
     parent_qs = {"CHILD": (q1,q2), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
     child_qs = {"PARENT": (q2, q1), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}

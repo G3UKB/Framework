@@ -58,23 +58,26 @@ class Routing:
         self.__qs = qs
     
     # Add a new route    
-    def add_route(self, desc):
+    def add_route(self, target, desc):
+        # target can be LOCAL or REMOTE
         # The descriptor can contain
-        #   [proc_name, [task_name, task_name, ...]]
+        #   [proc_name, [[task_name, task_name, ...]]
         #   for processes residing on this machine
         # or for processes residing on another machine
         #   [proc_name (aka device), [[task_name, task_name, ...], IP-Addr (or DNS name), in-port, out-port]]
         
         self.__lk.acquire()
-        self.__routes[desc[0]] = desc[1]
+        self.__routes[target][desc[0]] = desc[1]
         self.__lk.release()
     
     #  Get desc and Q for process   
     def get_route(self, process):
         r = None
         self.__lk.acquire()
-        if process in self.__routes:
-            r = self.__routes[process]
+        if process in self.__routes[LOCAL]:
+            r = self.__routes[LOCAL][process]
+        elif process in self.__routes[REMOTE]:
+            r = self.__routes[REMOTE][process]
         self.__lk.release()
         if process in self.__qs:
             return r, self.__qs[process]
@@ -89,23 +92,29 @@ class Routing:
         self.__lk.release()
         return r, self.__qs
     
-    # Return process and q for given task
-    # The process could be this process, anther on this machine or a remote machine
+    # Return process and Q for given task
+    # The process could be this process, another on this machine or a remote machine
     def process_for_task(self, task):
         r = None
         self.__lk.acquire()
         # Can't directly iterate a proxy
         # This is a simple work round as the dict is small
         routes = copy.deepcopy(self.__routes)
-        for process in routes:
-            if task in routes[process[0]]:
+        found = False
+        for process in routes[LOCAL]:
+            if task in routes[LOCAL][process]:
                 r = process
+                found = True
                 break
+        if not found:
+            for process in routes[REMOTE]:
+                if task in routes[REMOTE][process]:
+                    r = process
+                    break
         self.__lk.release()
         if r in self.__qs:
             return r, self.__qs[process]
         else:
             return r, None
-                
-            
+    
     
