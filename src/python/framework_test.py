@@ -48,13 +48,11 @@ import imc_server
 
 class FrTest:
 
-    def __init__(self, name, ar_task_ids, ar_imc_ids, imc_q, qs, mp_dict, mp_event):
+    def __init__(self, ar_task_ids, ar_imc_ids, qs, mp_dict, mp_event):
         
         # Save params
-        self.__name = name
         self.__tid = ar_task_ids
         self.__imc = ar_imc_ids
-        self.__imc_q = imc_q
         self.__qs = qs
         self.__mp_dict = mp_dict
         self.__mp_event = mp_event
@@ -65,6 +63,8 @@ class FrTest:
         self.GS1 = self.__tid[0]
         self.GS2 = self.__tid[1]
 
+        # ======================================================
+        # General setup that will always be required
         # Make a task data manager
         td_man = td_manager.TdManager()
     
@@ -75,21 +75,27 @@ class FrTest:
         # Make a router
         router = routing.Routing(self.__mp_dict, self.__qs)
         # Add routes for this process
-        router.add_route(self.__name, self.__tid)
+        for desc in self.__tid:
+            router.add_route(desc)
         
         # Make an IMC server
         imc_inst = imc_server.ImcServer(self.__imc, self.__imc_q)
         imc_inst.start()
         
         # Add IMC routes
-        router.add_route("IMC", self.__imc)
+        for desc in self.__imc:
+            router.add_route(desc)
         
         # Make a GenServer instance to manage gen servers in this process
         self.__gs_inst = gs.GenServer(td_man, router)
         
+        # End general setup
+        # ======================================================
+        
         # Print context
         #print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
         
+        # Following is test code as an example of usage
         # Make 2 gen-servers
         self.__gs_inst.server_new(self.GS1, self.gs1_dispatch)
         self.__gs_inst.server_new(self.GS2, self.gs2_dispatch)
@@ -242,18 +248,19 @@ class FrTest:
                 print("%s [unknown message %s]" % (self.GS2, msg))
     
 # Run parent instance tests
-def run_parent_process(ar_task_ids, ar_imc_ids, imc_q, d_process_qs, mp_dict, mp_event):
+def run_parent_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
     # Kick off a test 
-    FrTest("PARENT", ar_task_ids, ar_imc_ids, imc_q, d_process_qs, mp_dict, mp_event).run()
+    FrTest(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run()
 
 # Run child instance tests
-def run_child_process(ar_task_ids, ar_imc_ids, imc_q, d_process_qs, mp_dict, mp_event):
+def run_child_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
     # Kick off a test
-    p = mp.Process(target=FrTest("CHILD", ar_task_ids, ar_imc_ids, imc_q, d_process_qs, mp_dict, mp_event).run)
+    p = mp.Process(target=FrTest(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
     p.start()
     
 # Test entry point  
 if __name__ == '__main__':
+    
     # Make the one and only shared dictionary
     mp_manager = mp.Manager()
     mp_dict = mp_manager.dict()
@@ -265,17 +272,28 @@ if __name__ == '__main__':
     # The second sends messages to 'name'.
     q1 = mp.Queue()
     q2 = mp.Queue()
+    # Q's for IMC messages
     q3 = queue.Queue()
+    q4 = queue.Queue()
     
     # Kick off a parent process
     # Start a user thread in the main process
-    # Define the remote devices
-    imc = [q3, [["E", "F"],"192,168.1.200", 10000, 10001], [["G", "H"],"192,168.1.201", 10000, 10001]]
-    t1 = threading.Thread(target=run_parent_process, args=(["A", "B"], imc, q3, {"CHILD": (q1,q2)}, mp_dict, mp_event))
+    # Define the local processes
+    local_procs_1 = ["PARENT", [["A", "B"],]]
+    local_procs_2 = ["CHILD", [["C", "D"],]]
+    # Define the remote processes
+    remote_procs = ["DEVICE-A", [["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", [["G", "H"],"192,168.1.201", 10000, 10001]]
+    # Define queues, note the process needs to know the processes it can communicate with
+    parent_qs = {"CHILD": (q1,q2), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
+    child_qs = {"PARENT": (q2, q1), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
+    
+    # Run processes, starting on their own thread
+    # main process
+    t1 = threading.Thread(target=run_parent_process, args=(local_procs_1, remote_procs, parent_qs, mp_dict, mp_event))
     t1.start()
     sleep(2)
     # and a child process
-    t2 = threading.Thread(target=run_child_process, args=(["C", "D"], imc, q3, {"PARENT": (q2, q1)}, mp_dict, mp_event))
+    t2 = threading.Thread(target=run_child_process, args=(local_procs_2, remote_procs, child_qs, mp_dict, mp_event))
     t2.start()
     sleep(1)
     

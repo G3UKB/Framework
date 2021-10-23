@@ -46,26 +46,42 @@ import copy
 class Routing:
     
     def __init__(self, router, qs):
+        
+        # Router is the single instance of the shared router dictionary
+        # Queues are defined as follows:
+        # {process-name: (q1,q2), process_name: (...), ..., "IMC": (q3,)}
+        # Such that the process is the target and the queues are q1 = input, q2 = output
+        # For remote targets there is only one q which is the local q to send to the imc_server
+        
         self.__routes = router
         self.__lk = Lock()
         self.__qs = qs
+    
+    # Add a new route    
+    def add_route(self, desc):
+        # The descriptor can contain
+        #   [proc_name, [task_name, task_name, ...]]
+        #   for processes residing on this machine
+        # or for processes residing on another machine
+        #   [proc_name (aka device), [[task_name, task_name, ...], IP-Addr (or DNS name), in-port, out-port]]
         
-    def add_route(self, process, tasks):
         self.__lk.acquire()
-        self.__routes[process] = tasks
+        self.__routes[desc[0]] = desc[1]
         self.__lk.release()
-        
+    
+    #  Get desc and Q for process   
     def get_route(self, process):
         r = None
         self.__lk.acquire()
         if process in self.__routes:
-            r = self.__routes[name]
+            r = self.__routes[process]
         self.__lk.release()
         if process in self.__qs:
             return r, self.__qs[process]
         else:
             return r, None
     
+    # Return all routes and associated Q's
     def get_routes(self):
         r = None
         self.__lk.acquire()
@@ -73,6 +89,8 @@ class Routing:
         self.__lk.release()
         return r, self.__qs
     
+    # Return process and q for given task
+    # The process could be this process, anther on this machine or a remote machine
     def process_for_task(self, task):
         r = None
         self.__lk.acquire()
@@ -80,7 +98,7 @@ class Routing:
         # This is a simple work round as the dict is small
         routes = copy.deepcopy(self.__routes)
         for process in routes:
-            if task in routes[process]:
+            if task in routes[process[0]]:
                 r = process
                 break
         self.__lk.release()
