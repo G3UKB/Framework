@@ -2,7 +2,7 @@
 #
 # framework_test.py
 #
-# Publish/Subscribe implementation
+# Framework test and example code
 # 
 # Copyright (C) 2021 by G3UKB Bob Cowdery
 # This program is free software; you can redistribute it and/or modify
@@ -82,7 +82,6 @@ class FrTest:
         # Make an IMC server
         imc_inst = imc_server.ImcServer(self.__imc, self.__imc_q)
         imc_inst.start()
-        
         # Add IMC routes
         for desc in self.__imc[1]:
             router.add_route(self.__imc[0], desc)
@@ -279,12 +278,15 @@ if __name__ == '__main__':
     
     # These should be in a config file and not hard coded!
     # Define the local processes
+    # Tag LOCAL defines a list of process name against task names.
+    # In general there is only one entry but for consistency with IMC its a list
     local_procs_1 = [LOCAL, [["PARENT", ["A", "B"]],]]
     local_procs_2 = [LOCAL, [["CHILD", ["C", "D"]],]]
     # Define the remote processes
+    # Tag REMOTE defines a list of process/device name against task names + connectivity information.
     remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10000, 10001]]
     # Define queues, note the process needs to know the processes it can communicate with
-    parent_qs = {"CHILD": (q1,q2), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
+    parent_qs = {"CHILD": (q1, q2), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
     child_qs = {"PARENT": (q2, q1), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
     
     # Run processes, starting on their own thread
