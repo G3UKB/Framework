@@ -28,7 +28,8 @@ import threading
 from time import sleep
 
 # Application imports
-    
+from defs import *
+
 # ====================================================================
 # Manager for task dictionary
 

@@ -27,6 +27,9 @@
 from multiprocessing import Manager, Lock
 from time import sleep
 
+# Application imports
+from defs import *
+
 """
     Shared multiprocessing.Manager to store shared routing state. This is a dictionary of the form:
         {process-name: [task-name, task-name, ...], process-name [...], ...}
@@ -41,7 +44,11 @@ from time import sleep
     process and then each Process can create an instance of Routing to provide the convienience access methods.
 """
 
+# System imports
 import copy
+
+# Application imports
+from defs import *
 
 class Routing:
     
@@ -67,7 +74,9 @@ class Routing:
         #   [proc_name (aka device), [[task_name, task_name, ...], IP-Addr (or DNS name), in-port, out-port]]
         
         self.__lk.acquire()
-        self.__routes[target][desc[0]] = desc[1]
+        print(target, desc)
+        self.__routes[target] = desc
+        print(self.__routes)
         self.__lk.release()
     
     #  Get desc and Q for process   

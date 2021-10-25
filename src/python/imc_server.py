@@ -30,6 +30,7 @@ import threading
 from time import sleep
 
 # Application imports
+from defs import *
 import td_manager
 
 # ====================================================================

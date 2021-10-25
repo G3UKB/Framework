@@ -78,7 +78,7 @@ class FrTest:
         # Add routes for this process
         for desc in self.__tid[1]:
             router.add_route(self.__tid[0], desc)
-        
+
         # Make an IMC server
         imc_inst = imc_server.ImcServer(self.__imc, self.__imc_q)
         imc_inst.start()
@@ -286,8 +286,10 @@ if __name__ == '__main__':
     # Tag REMOTE defines a list of process/device name against task names + connectivity information.
     remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10000, 10001]]
     # Define queues, note the process needs to know the processes it can communicate with
-    parent_qs = {"CHILD": (q1, q2), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
-    child_qs = {"PARENT": (q2, q1), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
+    #parent_qs = {"CHILD": (q1, q2), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
+    #child_qs = {"PARENT": (q2, q1), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
+    parent_qs = {"CHILD": (q1, q2),}
+    child_qs = {"PARENT": (q2, q1),}
     
     # Run processes, starting on their own thread
     # main process
