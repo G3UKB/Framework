@@ -64,6 +64,14 @@ class FrTest:
         self.GS1 = self.__tid[0]
         self.GS2 = self.__tid[1]
 
+        # We need to create local queues for the IMC messages
+        # as we cannot pass these across a process boundary
+        self.__imc_qs = []
+        # and add them to the mp queues
+        for desc in self.__imc[1]:
+            self.__imc_qs.append(queue.Queue())
+            self.__qs[desc[0]] = self.__imc_qs[-1]       
+        
         # ======================================================
         # General setup that will always be required
         # Make a task data manager
@@ -80,7 +88,7 @@ class FrTest:
             router.add_route(self.__tid[0], desc)
 
         # Make an IMC server
-        imc_inst = imc_server.ImcServer(self.__imc, self.__imc_q)
+        imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__qs)
         imc_inst.start()
         # Add IMC routes
         for desc in self.__imc[1]:
@@ -105,9 +113,7 @@ class FrTest:
         self.__gs_inst.server_reg(self.__name, None, self.main_dispatch, q)
         
         # Wait for ready
-        print(self.__name, " waiting")
         self.__mp_event.wait()
-        print(self.__name, " proceeding")
         
         # Send message to A and B from main thread
         self.__gs_inst.server_msg(self.GS1, ["Message 1 to %s" % self.GS1])
@@ -272,9 +278,6 @@ if __name__ == '__main__':
     # The second sends messages to 'name'.
     q1 = mp.Queue()
     q2 = mp.Queue()
-    # Q's for IMC messages
-    q3 = queue.Queue()
-    q4 = queue.Queue()
     
     # These should be in a config file and not hard coded!
     # Define the local processes
@@ -285,9 +288,8 @@ if __name__ == '__main__':
     # Define the remote processes
     # Tag REMOTE defines a list of process/device name against task names + connectivity information.
     remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10000, 10001]]
-    # Define queues, note the process needs to know the processes it can communicate with
-    #parent_qs = {"CHILD": (q1, q2), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
-    #child_qs = {"PARENT": (q2, q1), "DEVICE-A": (q3,), "DEVICE-B": (q4,)}
+    # These are multiprocessing queues and need to be created here to pass to each process
+    # as they need to know the respective send and receive q's
     parent_qs = {"CHILD": (q1, q2),}
     child_qs = {"PARENT": (q2, q1),}
     

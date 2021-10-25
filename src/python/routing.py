@@ -74,9 +74,7 @@ class Routing:
         #   [proc_name (aka device), [[task_name, task_name, ...], IP-Addr (or DNS name), in-port, out-port]]
         
         self.__lk.acquire()
-        print(target, desc)
         self.__routes[target] = desc
-        print(self.__routes)
         self.__lk.release()
     
     #  Get desc and Q for process   

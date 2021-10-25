@@ -25,6 +25,7 @@
 
 # System imports
 import socket
+import select
 import pickle
 import threading
 from time import sleep
@@ -40,39 +41,36 @@ import td_manager
 # The imc task
 class ImcServer(threading.Thread):
     
-    def __init__(self, td_man, desc, q):
+    def __init__(self, td_man, desc, qs):
         super(ImcServer, self).__init__()
         self.__td_man = td_man
         # desc is of the form
         # [[["E", "F"],"192,168.1.200", 10000, 10001], [["G", "H"],"192,168.1.201", 10000, 10001]]
         # We listen for remote data on the first port and dispatch it locally
         # We listen for local requests on q to be sent to a remote destination and dispatch to the second port
-        self.__q = q
-        self.__spec = desc
+        self.__qs = qs
+        self.__desc = desc
         self.__term = False
         
         # Open sockets
-        rlist = []
-        wlist = []
-        xlist = []
+        self.__rlist = []
         
-        for dest in spec:
-            task_id, ip_addr, out_port, in_port = dest
-            rlist.append(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
+        for dest in desc[1]:
+            device, task_id, ip_addr, out_port, in_port = dest
+            self.__rlist.append(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
             #wlist.append(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
         index = 0
         # Bind to all adapters on the receiving ports
-        for sock in rlist:
-            sock.bind(('', spec[index][2]))
+        for sock in self.__rlist:
+            sock.bind(('', desc[1][index][3]))
         
     def terminate(self):
         self.__term = True
         
     def run(self):
         while not self.__term:
-            
             # Wait for remote data
-            r, w, x = select.Select(rlist, wlist, xlist, 0.0)
+            r, w, x = select.select(self.__rlist,[], [], 0.0)
             if len(r) > 0:
                 # Data available
                 for s in r:
@@ -80,14 +78,14 @@ class ImcServer(threading.Thread):
                     data = pickle.loads(data)
                     # Dispatch locally
                     self.__process(data)
-            else:
-                try:
-                    data = self.__q.get(block=False)
-                    data = pickle.dumps(data)
-                    # Send message
-                    s.sendto(data, (dest[0], dest[2]))
-                except queue.Empty:
-                    continue
+            #else:
+                #try:
+                #    data = self.__q.get(block=False)
+                #    data = pickle.dumps(data)
+                #    # Send message
+                #    s.sendto(data, (dest[0], dest[2]))
+                #except queue.Empty:
+                #    continue
             sleep(0.05)
         print("ImcServer terminating...")
             
