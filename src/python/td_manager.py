@@ -49,6 +49,7 @@ class TdManager:
         self.__lock.release()
         
     def store_task_ref(self, name, ref):
+        print("name ", name, "ref ", ref)
         self.lock()
         self.__td[name] = ref
         self.release()

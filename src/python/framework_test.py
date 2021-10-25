@@ -66,11 +66,9 @@ class FrTest:
 
         # We need to create local queues for the IMC messages
         # as we cannot pass these across a process boundary
-        self.__imc_qs = []
-        # and add them to the mp queues
+        self.__imc_qs = {}
         for desc in self.__imc[1]:
-            self.__imc_qs.append(queue.Queue())
-            self.__qs[desc[0]] = self.__imc_qs[-1]       
+            self.__imc_qs[desc[0]] = queue.Queue()     
         
         # ======================================================
         # General setup that will always be required
@@ -88,7 +86,7 @@ class FrTest:
             router.add_route(self.__tid[0], desc)
 
         # Make an IMC server
-        imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__qs)
+        imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__imc_qs)
         imc_inst.start()
         # Add IMC routes
         for desc in self.__imc[1]:
@@ -287,7 +285,7 @@ if __name__ == '__main__':
     local_procs_2 = [LOCAL, [["CHILD", ["C", "D"]],]]
     # Define the remote processes
     # Tag REMOTE defines a list of process/device name against task names + connectivity information.
-    remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10000, 10001]]
+    remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10002, 10003]]
     # These are multiprocessing queues and need to be created here to pass to each process
     # as they need to know the respective send and receive q's
     parent_qs = {"CHILD": (q1, q2),}
