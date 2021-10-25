@@ -61,8 +61,9 @@ class FrTest:
     # Entry point for process
     def run(self):
         
-        self.GS1 = self.__tid[0]
-        self.GS2 = self.__tid[1]
+        self.__name = self.__tid[1][0][0]
+        self.GS1 = self.__tid[1][0][1][0]
+        self.GS2 = self.__tid[1][0][1][1]
 
         # We need to create local queues for the IMC messages
         # as we cannot pass these across a process boundary
@@ -285,6 +286,7 @@ if __name__ == '__main__':
     local_procs_2 = [LOCAL, [["CHILD", ["C", "D"]],]]
     # Define the remote processes
     # Tag REMOTE defines a list of process/device name against task names + connectivity information.
+    # TBS --- If this is passed to multiple processes the bind will fail as can only bind a port once.
     remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10002, 10003]]
     # These are multiprocessing queues and need to be created here to pass to each process
     # as they need to know the respective send and receive q's

@@ -63,6 +63,7 @@ class ImcServer(threading.Thread):
         # Bind to all adapters on the receiving ports
         for sock in self.__rlist:
             sock.bind(('', desc[1][index][3]))
+            index += 1
         
     def terminate(self):
         self.__term = True
