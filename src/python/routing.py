@@ -109,13 +109,14 @@ class Routing:
         routes = copy.deepcopy(self.__routes)
         found = False
         for process in routes[LOCAL]:
-            if task in routes[LOCAL][process]:
+            print(routes[LOCAL])
+            if task in routes[LOCAL][process][1]:
                 r = process
                 found = True
                 break
         if not found:
             for process in routes[REMOTE]:
-                if task in routes[REMOTE][process]:
+                if task in routes[REMOTE][process][1]:
                     r = process
                     break
         self.__lk.release()
