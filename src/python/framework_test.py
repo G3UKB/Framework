@@ -67,9 +67,9 @@ class FrTest:
 
         # We need to create local queues for the IMC messages
         # as we cannot pass these across a process boundary
-        self.__imc_qs = {}
-        for desc in self.__imc[1]:
-            self.__imc_qs[desc[0]] = queue.Queue()     
+        #self.__imc_qs = {}
+        #for desc in self.__imc[1]:
+        #    self.__imc_qs[desc[0]] = queue.Queue()     
         
         # ======================================================
         # General setup that will always be required
@@ -87,11 +87,11 @@ class FrTest:
             router.add_route(self.__tid[0], desc)
 
         # Make an IMC server
-        imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__imc_qs)
-        imc_inst.start()
+        #imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__imc_qs)
+        #imc_inst.start()
         # Add IMC routes
-        for desc in self.__imc[1]:
-            router.add_route(self.__imc[0], desc)
+        #for desc in self.__imc[1]:
+        #    router.add_route(self.__imc[0], desc)
         
         # Make a GenServer instance to manage gen servers in this process
         self.__gs_inst = gs.GenServer(td_man, router)
@@ -280,6 +280,23 @@ if __name__ == '__main__':
     q1 = mp.Queue()
     q2 = mp.Queue()
     
+    # We need to create mp queues for the IMC messages
+    # as we cannot pass these across a process boundary
+    self.__imc_qs = {}
+    for desc in self.__imc[1]:
+        self.__imc_qs[desc[0]] = mp.Queue()     
+    
+    # Make an IMC server which runs as a remote service
+    #imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__imc_qs)
+    #imc_inst.start()
+    
+    p = mp.Process(target=imc_server.ImcServer(td_man, self.__imc, self.__imc_qs).run)
+    p.start()
+    
+    # Add IMC routes? How?
+    for desc in self.__imc[1]:
+        router.add_route(self.__imc[0], desc)    
+
     # These should be in a config file and not hard coded!
     # Define the local processes
     # Tag LOCAL defines a list of process name against task names.
