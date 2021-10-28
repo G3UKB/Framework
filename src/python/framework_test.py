@@ -158,6 +158,8 @@ class FrTest:
         sleep(1)
         fwds.terminate()
         fwds.join()
+        imc_inst.terminate()
+        imc_inst.join()
         self.__gs_inst.server_term_all()
         
     def main_dispatch(self, msg):
