@@ -280,11 +280,17 @@ if __name__ == '__main__':
     q1 = mp.Queue()
     q2 = mp.Queue()
     
+    # ===========================================================
+    # Define the remote processes
+    # Tag REMOTE defines a list of process/device name against task names + connectivity information.
+    # TBS --- If this is passed to multiple processes the bind will fail as can only bind a port once.
+    remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10002, 10003]]
+    
     # We need to create mp queues for the IMC messages
     # as we cannot pass these across a process boundary
     self.__imc_qs = {}
     for desc in self.__imc[1]:
-        self.__imc_qs[desc[0]] = mp.Queue()     
+        self.__imc_qs[desc[0]] = (mp.Queue(), mp.Queue())     
     
     # Make an IMC server which runs as a remote service
     #imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__imc_qs)
@@ -296,7 +302,8 @@ if __name__ == '__main__':
     # Add IMC routes? How?
     for desc in self.__imc[1]:
         router.add_route(self.__imc[0], desc)    
-
+    # ========================================================
+    
     # These should be in a config file and not hard coded!
     # Define the local processes
     # Tag LOCAL defines a list of process name against task names.
@@ -306,7 +313,7 @@ if __name__ == '__main__':
     # Define the remote processes
     # Tag REMOTE defines a list of process/device name against task names + connectivity information.
     # TBS --- If this is passed to multiple processes the bind will fail as can only bind a port once.
-    remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10002, 10003]]
+    #remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10002, 10003]]
     # These are multiprocessing queues and need to be created here to pass to each process
     # as they need to know the respective send and receive q's
     parent_qs = {"CHILD": (q1, q2),}
