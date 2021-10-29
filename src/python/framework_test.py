@@ -300,33 +300,44 @@ if __name__ == '__main__':
         else:
             # Child process
             q_local_children[proc[0]] = {parent_name: [q1, q2]}
+    print(q_local_children)
     # We now have all the child procs with q's that point to the parent
     # Add all q's to the parent but reverse the receive/send q's
     q_local_parent = {}
     for proc in q_local_children.keys():
-        q_local_parent[proc] = [q_local_children[proc][1], q_local_children[proc][0]]
+        print(proc)
+        q_local_parent[proc] = [q_local_children[proc][parent_name][1], q_local_children[proc][parent_name][0]]
+    print(q_local_parent)
 
     # ===========================================================
     # Define the remote machine processes
+    # Each machine has one IMC process which communicates on a pair or q's with all its processes which means processes have to read and put back if not for it.
     # Tag REMOTE defines a list of process/device name against task names + connectivity information.
-    # TBS --- If this is passed to multiple processes the bind will fail as can only bind a port once.
     remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10002, 10003]]
     
-    # We need to create mp queues for the IMC messages
+    # We need to create two mp queues for each process on the machine for the IMC messages
     imc_qs = {}
-    for desc in self.__imc[1]:
-        self.__imc_qs[desc[0]] = (mp.Queue(), mp.Queue())     
+    for desc in remote_procs[1]:
+        imc_qs[desc[0]] = (mp.Queue(), mp.Queue())     
     
     # Make an IMC server which runs as a remote service
-    #imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__imc_qs)
-    #imc_inst.start()
-    
-    p = mp.Process(target=imc_server.ImcServer(td_man, remote_procs, imc_qs).run)
+    # Create ports list
+    # This is the ports to listen on
+    ports = []
+    for desc in remote_procs[1]:
+        ports.append(desc[3])
+    # Create queues
+    # there is an in and out q for each process on the machine
+    # {proc_name: (q, q), ...}
+    queues = {}
+    for proc in local_procs[1]:   
+        q1 = mp.Queue()
+        q2 = mp.Queue()
+        queues[proc[0]] = (q1, q2)
+        
+        
+    p = mp.Process(target=imc_server.ImcServer(ports, queues).run)
     p.start()
-    
-    # Add IMC routes? How?
-    for desc in self.__imc[1]:
-        router.add_route(self.__imc[0], desc)
         
     # ========================================================
     # Run processes, starting on their own thread

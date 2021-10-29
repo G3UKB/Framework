@@ -39,68 +39,57 @@ import td_manager
 # API
 
 # The imc task
-class ImcServer(threading.Thread):
+class ImcServer():
     
-    def __init__(self, td_man, desc, qs):
+    def __init__(self, ports, queues):
         super(ImcServer, self).__init__()
-        self.__td_man = td_man
-        # desc is of the form
-        # [[["E", "F"],"192,168.1.200", 10000, 10001], [["G", "H"],"192,168.1.201", 10000, 10001]]
-        # We listen for remote data on the first port and dispatch it locally
-        # We listen for local requests on q to be sent to a remote destination and dispatch to the second port
-        self.__qs = qs
-        self.__desc = desc
+        
+        # ports - are a list of ports on which to listen
+        # queues - is a dictionary {proc_name: (in_q, out_q), ...}
+        #
+        # Process:
+        #   is to listen on the given ports. If data is received it is sent on the output q
+        #       to the destination process. Message is [dest_proc, data].
+        #   is the monitor the input q where data will be of the form:
+        #       ["192,168.1.200", 10000, [data to be dispatched]]
+        #   we send the data message to the given end point.
+        
+        self.__qs = queues
+        self.__ports = ports
         self.__term = False
         
-        # Open sockets
+        # Open and bind sockets
         self.__rlist = []
-        
-        for dest in desc[1]:
-            device, task_id, ip_addr, out_port, in_port = dest
+        for port in self.__ports:
             self.__rlist.append(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
-            #wlist.append(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
-        index = 0
-        # Bind to all adapters on the receiving ports
-        for sock in self.__rlist:
-            sock.bind(('', desc[1][index][3]))
-            index += 1
+            sock.bind(('', port)
         
     def terminate(self):
         self.__term = True
         
     def run(self):
         while not self.__term:
-            # Wait for remote data
+            # Wait for remote data with zero timeout
             r, w, x = select.select(self.__rlist,[], [], 0.0)
             if len(r) > 0:
                 # Data available
                 for s in r:
                     data, _ = s.recvfrom(512)
                     data = pickle.loads(data)
-                    # Dispatch locally
-                    self.__process(data)
-            #else:
-                #try:
-                #    data = self.__q.get(block=False)
-                #    data = pickle.dumps(data)
-                #    # Send message
-                #    s.sendto(data, (dest[0], dest[2]))
-                #except queue.Empty:
-                #    continue
+                    [proc, data] = data
+                    # Dispatch on the output q
+                    self.__qs[proc][1].put(data)
+            else:
+                for q in self.__qs.value():
+                    try:
+                        data = q[0].get(block=False)
+                    except queue.Empty:
+                        continue
+                    data = pickle.dumps(data)
+                    [ip, port, [data]] = data
+                    # Send message
+                    s.sendto(data, (ip, port))
             sleep(0.05)
         print("ImcServer terminating...")
-            
-    def __process(self, msg):
-        # A message is of this form but data is opaque to us
-        # [name, [*] | [sender, [*]]]
-        name, data = msg
-        # Lookup the destination
-        item = self.__td_man.get_task_ref(name)
-        if item == None:
-            # No destination 
-            print("ImcServer - destination %s not found!" % (name))
-        else:
-            # Dispatch
-            _, d, q = item
-            d(data)
+
             
