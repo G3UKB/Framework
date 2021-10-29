@@ -60,10 +60,9 @@ class FrTest:
         
     # Entry point for process
     def run(self):
-        
-        self.__name = self.__tid[1][0][0]
-        self.GS1 = self.__tid[1][0][1][0]
-        self.GS2 = self.__tid[1][0][1][1]
+        self.__name = self.__tid[1][0]
+        self.GS1 = self.__tid[1][1][0]
+        self.GS2 = self.__tid[1][1][1]
 
         # ======================================================
         # General setup that will always be required
@@ -77,8 +76,7 @@ class FrTest:
         # Make a router
         router = routing.Routing(self.__mp_dict, self.__qs)
         # Add routes for this process
-        for desc in self.__tid[1]:
-            router.add_route(self.__tid[0], desc)
+        router.add_route(self.__tid[0], self.__tid[1])
 
         # Add IMC routes
         for desc in self.__imc[1]:
@@ -149,8 +147,6 @@ class FrTest:
         sleep(1)
         fwds.terminate()
         fwds.join()
-        imc_inst.terminate()
-        imc_inst.join()
         self.__gs_inst.server_term_all()
         
     def main_dispatch(self, msg):
@@ -274,6 +270,11 @@ if __name__ == '__main__':
     # Tag LOCAL defines a list of process name against task names.
     # TBD - put this in a config file
     local_procs = [LOCAL, [["PARENT", ["A", "B"]],["CHILD", ["C", "D"]]]]
+    expanded_local_procs = []
+    for proc in local_procs[1]:
+        expanded_local_procs.append([LOCAL, proc])
+        
+    
     # The first entry must be the initiating Python instance, subsequent
     # entries are other Python instances on this machine.
     
@@ -300,14 +301,12 @@ if __name__ == '__main__':
         else:
             # Child process
             q_local_children[proc[0]] = {parent_name: [q1, q2]}
-    print(q_local_children)
+
     # We now have all the child procs with q's that point to the parent
     # Add all q's to the parent but reverse the receive/send q's
     q_local_parent = {}
     for proc in q_local_children.keys():
-        print(proc)
         q_local_parent[proc] = [q_local_children[proc][parent_name][1], q_local_children[proc][parent_name][0]]
-    print(q_local_parent)
 
     # ===========================================================
     # Define the remote machine processes
@@ -334,19 +333,18 @@ if __name__ == '__main__':
         q1 = mp.Queue()
         q2 = mp.Queue()
         queues[proc[0]] = (q1, q2)
-        
-        
-    p = mp.Process(target=imc_server.ImcServer(ports, queues).run)
-    p.start()
+                
+    imc = mp.Process(target=imc_server.ImcServer(ports, queues).run)
+    imc.start()
         
     # ========================================================
     # Run processes, starting on their own thread
     # main process
-    t1 = threading.Thread(target=run_parent_process, args=(local_procs[1][0], remote_procs, q_local_parent, mp_dict, mp_event))
+    t1 = threading.Thread(target=run_parent_process, args=(expanded_local_procs[0], remote_procs, q_local_parent, mp_dict, mp_event))
     t1.start()
     sleep(2)
     # and a child process
-    t2 = threading.Thread(target=run_child_process, args=(local_procs[1][0], remote_procs, q_local_children[1], mp_dict, mp_event))
+    t2 = threading.Thread(target=run_child_process, args=(expanded_local_procs[1], remote_procs, q_local_children['CHILD'], mp_dict, mp_event))
     t2.start()
     sleep(1)
     
@@ -356,4 +354,5 @@ if __name__ == '__main__':
     # Wait for completion
     t1.join()
     t2.join()
+    imc.join()
 

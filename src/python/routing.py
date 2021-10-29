@@ -72,7 +72,6 @@ class Routing:
         #   for processes residing on this machine
         # or for processes residing on another machine
         #   [proc_name (aka device), [[task_name, task_name, ...], IP-Addr (or DNS name), in-port, out-port]]
-        
         self.__lk.acquire()
         self.__routes[target] = desc
         self.__lk.release()

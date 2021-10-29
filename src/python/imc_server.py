@@ -27,7 +27,7 @@
 import socket
 import select
 import pickle
-import threading
+import multiprocessing as mp
 from time import sleep
 
 # Application imports
@@ -61,8 +61,9 @@ class ImcServer():
         # Open and bind sockets
         self.__rlist = []
         for port in self.__ports:
-            self.__rlist.append(socket.socket(socket.AF_INET, socket.SOCK_DGRAM))
-            sock.bind(('', port)
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.__rlist.append(s)
+            s.bind(('', port))
         
     def terminate(self):
         self.__term = True
@@ -80,10 +81,10 @@ class ImcServer():
                     # Dispatch on the output q
                     self.__qs[proc][1].put(data)
             else:
-                for q in self.__qs.value():
+                for q in self.__qs.values():
                     try:
                         data = q[0].get(block=False)
-                    except queue.Empty:
+                    except Exception as err:
                         continue
                     data = pickle.dumps(data)
                     [ip, port, [data]] = data
