@@ -65,12 +65,6 @@ class FrTest:
         self.GS1 = self.__tid[1][0][1][0]
         self.GS2 = self.__tid[1][0][1][1]
 
-        # We need to create local queues for the IMC messages
-        # as we cannot pass these across a process boundary
-        #self.__imc_qs = {}
-        #for desc in self.__imc[1]:
-        #    self.__imc_qs[desc[0]] = queue.Queue()     
-        
         # ======================================================
         # General setup that will always be required
         # Make a task data manager
@@ -86,12 +80,9 @@ class FrTest:
         for desc in self.__tid[1]:
             router.add_route(self.__tid[0], desc)
 
-        # Make an IMC server
-        #imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__imc_qs)
-        #imc_inst.start()
         # Add IMC routes
-        #for desc in self.__imc[1]:
-        #    router.add_route(self.__imc[0], desc)
+        for desc in self.__imc[1]:
+            router.add_route(self.__imc[0], desc)
         
         # Make a GenServer instance to manage gen servers in this process
         self.__gs_inst = gs.GenServer(td_man, router)
@@ -264,31 +255,65 @@ def run_child_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
     # Kick off a test
     p = mp.Process(target=FrTest(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
     p.start()
-    
+ 
+# =======================================================================================   
 # Test entry point  
 if __name__ == '__main__':
     
-    # Make the one and only shared dictionary
+    #===========================================================
+    # The one and only multiprocessing.Manager
     mp_manager = mp.Manager()
+    # Make the shared dictionary
     mp_dict = mp_manager.dict()
+    # Make a shared startup event
     mp_event = mp_manager.Event()
     
-    # Make multiprocessor.Queues between each process
-    # There is a pair of queues for each communication channel
-    # The first in the pair the listens for messages from 'name'.
-    # The second sends messages to 'name'.
-    q1 = mp.Queue()
-    q2 = mp.Queue()
+    #===========================================================
+    # Define the local within machine processes
     
+    # Tag LOCAL defines a list of process name against task names.
+    # TBD - put this in a config file
+    local_procs = [LOCAL, [["PARENT", ["A", "B"]],["CHILD", ["C", "D"]]]]
+    # The first entry must be the initiating Python instance, subsequent
+    # entries are other Python instances on this machine.
+    
+    # We need a pair of multiprocessor.Queue between each communicating instance
+    # This could get complicated so in the interests of simplicity we limit the net
+    # between the main process and one child process. 
+    # The first in the pair listens for messages from 'name'.
+    # The second sends messages to 'name'.
+    # q_local will be of the form {name: {name: [task_name, task_name, ...]}, name: ...}
+    # The parent process wants all of the child q's for receive and send
+    # Each child wants the parent q's
+    q_local_children = {}
+    first = True
+    parent_name = ''
+    for proc in local_procs[1]:
+        q1 = mp.Queue()
+        q2 = mp.Queue()
+        if first:
+            # Main process
+            #q_local[proc[0]] = {proc[0]: [q2, q1]}
+            # Note name
+            parent_name = proc[0]
+            first = False
+        else:
+            # Child process
+            q_local_children[proc[0]] = {parent_name: [q1, q2]}
+    # We now have all the child procs with q's that point to the parent
+    # Add all q's to the parent but reverse the receive/send q's
+    q_local_parent = {}
+    for proc in q_local_children.keys():
+        q_local_parent[proc] = [q_local_children[proc][1], q_local_children[proc][0]]
+
     # ===========================================================
-    # Define the remote processes
+    # Define the remote machine processes
     # Tag REMOTE defines a list of process/device name against task names + connectivity information.
     # TBS --- If this is passed to multiple processes the bind will fail as can only bind a port once.
     remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10002, 10003]]
     
     # We need to create mp queues for the IMC messages
-    # as we cannot pass these across a process boundary
-    self.__imc_qs = {}
+    imc_qs = {}
     for desc in self.__imc[1]:
         self.__imc_qs[desc[0]] = (mp.Queue(), mp.Queue())     
     
@@ -296,36 +321,21 @@ if __name__ == '__main__':
     #imc_inst = imc_server.ImcServer(td_man, self.__imc, self.__imc_qs)
     #imc_inst.start()
     
-    p = mp.Process(target=imc_server.ImcServer(td_man, self.__imc, self.__imc_qs).run)
+    p = mp.Process(target=imc_server.ImcServer(td_man, remote_procs, imc_qs).run)
     p.start()
     
     # Add IMC routes? How?
     for desc in self.__imc[1]:
-        router.add_route(self.__imc[0], desc)    
+        router.add_route(self.__imc[0], desc)
+        
     # ========================================================
-    
-    # These should be in a config file and not hard coded!
-    # Define the local processes
-    # Tag LOCAL defines a list of process name against task names.
-    # In general there is only one entry but for consistency with IMC its a list
-    local_procs_1 = [LOCAL, [["PARENT", ["A", "B"]],]]
-    local_procs_2 = [LOCAL, [["CHILD", ["C", "D"]],]]
-    # Define the remote processes
-    # Tag REMOTE defines a list of process/device name against task names + connectivity information.
-    # TBS --- If this is passed to multiple processes the bind will fail as can only bind a port once.
-    #remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10002, 10003]]
-    # These are multiprocessing queues and need to be created here to pass to each process
-    # as they need to know the respective send and receive q's
-    parent_qs = {"CHILD": (q1, q2),}
-    child_qs = {"PARENT": (q2, q1),}
-    
     # Run processes, starting on their own thread
     # main process
-    t1 = threading.Thread(target=run_parent_process, args=(local_procs_1, remote_procs, parent_qs, mp_dict, mp_event))
+    t1 = threading.Thread(target=run_parent_process, args=(local_procs[1][0], remote_procs, q_local_parent, mp_dict, mp_event))
     t1.start()
     sleep(2)
     # and a child process
-    t2 = threading.Thread(target=run_child_process, args=(local_procs_2, remote_procs, child_qs, mp_dict, mp_event))
+    t2 = threading.Thread(target=run_child_process, args=(local_procs[1][0], remote_procs, q_local_children[1], mp_dict, mp_event))
     t2.start()
     sleep(1)
     
