@@ -354,5 +354,6 @@ if __name__ == '__main__':
     # Wait for completion
     t1.join()
     t2.join()
+    # Need to terminate this somehow - send it a message on a special q
     imc.join()
 
