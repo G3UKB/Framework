@@ -332,8 +332,10 @@ if __name__ == '__main__':
         q1 = mp.Queue()
         q2 = mp.Queue()
         queues[proc[0]] = (q1, q2)
+    # Special control q
+    imc_ctl_q = mp.Queue()
                 
-    imc = mp.Process(target=imc_server.ImcServer(ports, queues).run)
+    imc = mp.Process(target=imc_server.ImcServer(ports, queues, imc_ctl_q).run)
     imc.start()
         
     # ========================================================
@@ -354,5 +356,6 @@ if __name__ == '__main__':
     t1.join()
     t2.join()
     # Need to terminate this somehow - send it a message on a special q
+    imc_ctl_q.put("QUIT")
     imc.join()
 

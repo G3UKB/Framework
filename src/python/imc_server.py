@@ -41,7 +41,7 @@ import td_manager
 # The imc task
 class ImcServer():
     
-    def __init__(self, ports, queues):
+    def __init__(self, ports, queues, ctl_q):
         super(ImcServer, self).__init__()
         
         # ports - are a list of ports on which to listen
@@ -56,6 +56,7 @@ class ImcServer():
         
         self.__qs = queues
         self.__ports = ports
+        self.__ctl_q = ctl_q
         self.__term = False
         
         # Open and bind sockets
@@ -90,6 +91,12 @@ class ImcServer():
                     [ip, port, [data]] = data
                     # Send message
                     s.sendto(data, (ip, port))
+            try:
+                data = self.__ctl_q.get(block=False)
+                if data =="QUIT":
+                    break
+            except Exception as err:
+                continue
             sleep(0.05)
         print("ImcServer terminating...")
 
