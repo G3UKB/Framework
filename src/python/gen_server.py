@@ -224,8 +224,6 @@ class GenServer:
 
     def get_target(self, name):
         # Which process or machine is the message destination
-        print("Get target for ", name, " : ",  self.__router.process_for_task(name))
-        print(self.__router)
         process, (_, data) = self.__router.process_for_task(name)
         if process != None:
             if data != None:

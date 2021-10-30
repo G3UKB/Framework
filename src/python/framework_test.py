@@ -273,7 +273,6 @@ if __name__ == '__main__':
     expanded_local_procs = []
     for proc in local_procs[1]:
         expanded_local_procs.append([LOCAL, proc])
-        
     
     # The first entry must be the initiating Python instance, subsequent
     # entries are other Python instances on this machine.
@@ -342,7 +341,7 @@ if __name__ == '__main__':
     # main process
     t1 = threading.Thread(target=run_parent_process, args=(expanded_local_procs[0], remote_procs, q_local_parent, mp_dict, mp_event))
     t1.start()
-    sleep(2)
+    #sleep(2)
     # and a child process
     t2 = threading.Thread(target=run_child_process, args=(expanded_local_procs[1], remote_procs, q_local_children['CHILD'], mp_dict, mp_event))
     t2.start()

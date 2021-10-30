@@ -73,17 +73,26 @@ class Routing:
         # or for processes residing on another machine
         #   [proc_name (aka device), [[task_name, task_name, ...], IP-Addr (or DNS name), in-port, out-port]]
         self.__lk.acquire()
-        self.__routes[target] = desc
+        # Dict is a proxy, can't just append to elements
+        if target in self.__routes:
+            current = copy.deepcopy(self.__routes[target])
+            current.append(desc)
+            self.__routes[target] = current
+        else:
+            self.__routes[target] = [desc]
         self.__lk.release()
     
     #  Get desc and Q for process   
     def get_route(self, process):
         r = None
         self.__lk.acquire()
-        if process in self.__routes[LOCAL]:
-            r = self.__routes[LOCAL][process]
-        elif process in self.__routes[REMOTE]:
-            r = self.__routes[REMOTE][process]
+        d = find_process(LOCAL, process)
+        if d != None:
+            r = d
+        else:
+            d = find_process(REMOTE, process)
+            if d != None:
+                r = d
         self.__lk.release()
         if process in self.__qs:
             return r, self.__qs[process]
@@ -108,20 +117,27 @@ class Routing:
         routes = copy.deepcopy(self.__routes)
         found = False
         for process in routes[LOCAL]:
-            print(routes[LOCAL])
-            if task in routes[LOCAL][1]:
-                r = process
+            if task in process[1]:
+                r = process[0]
                 found = True
                 break
         if not found:
             for process in routes[REMOTE]:
-                if task in routes[REMOTE][1]:
-                    r = process
+                if task in process[1]:
+                    r = process[0]
                     break
         self.__lk.release()
         if r in self.__qs:
-            return r, self.__qs[process]
+            return r, self.__qs[r]
         else:
             return r, None
     
+    # Return the descriptor for process or None
+    def find_process(self, target, process):
+        
+        l = self.__routes[target]
+        for d in l:
+            if d[0] == process:
+                return d
+        return None
     
