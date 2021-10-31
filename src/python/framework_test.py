@@ -66,28 +66,12 @@ class FrTest:
         self.GS2 = self.__tid[1][1][1]
 
         # ======================================================
-        # General setup that will always be required
-        # Make a task data manager
-        td_man = td_manager.TdManager()
-    
-        # Make and run a forward server
-        fwds = forwarder.FwdServer(td_man, self.__qs)
-        fwds.start()
-    
-        # Make a router
-        router = routing.Routing(self.__mp_dict, self.__qs)
-        # Add routes for this process
-        router.add_route(self.__tid[0], self.__tid[1])
-
-        # Add IMC routes
-        for desc in self.__imc[1]:
-            router.add_route(self.__imc[0], desc)
-        
-        # Make a GenServer instance to manage gen servers in this process
-        self.__gs_inst = gs.GenServer(td_man, router)
-        
-        # End general setup
-        # ======================================================
+        # Perform process init
+        fm = framework_mgr.ProcessInit(self.__tid, self.__imc, self.__qs, self.__mp_dict)
+        params = fm.start_of_day()
+        td_man = params['TD']
+        router = params['ROUTER']
+        self.__gs_inst = params['GS']
         
         # Print context
         #print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
@@ -146,8 +130,9 @@ class FrTest:
         
         # Terminate servers
         sleep(1)
-        fwds.terminate()
-        fwds.join()
+        #fwds.terminate()
+        #fwds.join()
+        fm.end_of_day()
         self.__gs_inst.server_term_all()
         
     def main_dispatch(self, msg):
@@ -255,7 +240,7 @@ def run_child_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
 
 def main():
     # Do start-of-day processing
-    fm = framework_mgr.FrameworkMgr('E:\\Projects\\Framework\\trunk\\src\\python\\config\\framework.cfg')
+    fm = framework_mgr.GlobalInit('E:\\Projects\\Framework\\trunk\\src\\python\\config\\framework.cfg')
     r, global_cfg = fm.start_of_day()
     local_procs = global_cfg[LOCAL]
     remote_procs = global_cfg[REMOTE]

@@ -36,6 +36,7 @@ import td_manager
 import routing
 import forwarder
 import imc_server
+import gen_server as gs
 
 """
 There are two startup routines which offload boilerplate stuff from the user.
@@ -51,8 +52,9 @@ file for each will be different.
 
 """
 
-# Single class contains all startup routines
-class FrameworkMgr:
+#==================================================
+# Global startup
+class GlobalInit:
     
     #==============================================================================================  
     def __init__(self, cfg):
@@ -176,9 +178,9 @@ class FrameworkMgr:
                       'CHILDREN': self.__q_local_children,
                       'DICT': self.__mp_dict,
                       'EVENT': self.__mp_event}
-            
+
     #==============================================================================================   
-    # Call this at end of dat
+    # Call this at end of day
     def end_of_day(self):
         if self.__is_remote: 
             # Send QUIT to imc control q
@@ -196,4 +198,49 @@ class FrameworkMgr:
             return config
         except Exception as e:
             log.error(e)
+
+
+#==================================================
+# Process startup
+class ProcessInit:
+    
+    #==============================================================================================   
+    def __init__(self, local_procs, remote_procs, local_queues, mp_dict):
+        self.__local_procs = local_procs
+        self.__remote_procs = remote_procs
+        self.__local_queues = local_queues
+        self.__mp_dict = mp_dict
         
+    #==============================================================================================   
+    # Call for each process startup
+    def start_of_day(self):
+        # ======================================================
+        # General setup for each process
+        # Make a task data manager
+        self.__td_man = td_manager.TdManager()
+    
+        # Make and run a forward server
+        self.__fwds = forwarder.FwdServer(self.__td_man, self.__local_queues)
+        self.__fwds.start()
+    
+        # Make a router
+        self.__router = routing.Routing(self.__mp_dict, self.__local_queues)
+        # Add routes for this process
+        self.__router.add_route(self.__local_procs[0], self.__local_procs[1])
+
+        # Add IMC routes
+        for desc in self.__remote_procs[1]:
+            self.__router.add_route(self.__remote_procs[0], desc)
+        
+        # Make a GenServer instance to manage gen servers in this process
+        self.__gs_inst = gs.GenServer(self.__td_man, self.__router)
+        
+        # Return the process specific objects
+        return {'TD': self.__td_man, 'ROUTER': self.__router, 'GS': self.__gs_inst}
+    
+    #==============================================================================================   
+    # Call this at end of process
+    def end_of_day(self):
+        self.__fwds.terminate()
+        self.__fwds.join()
+    
