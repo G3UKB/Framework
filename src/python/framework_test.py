@@ -33,6 +33,7 @@ from enum import Enum
 
 # Application imports
 from defs import *
+import framework_mgr
 import gen_server as gs
 import pub_sub as ps
 import td_manager
@@ -240,7 +241,7 @@ class FrTest:
                 self.__gs_inst.server_response( sender, ["Response to %s from %s" % (sender, self.GS2)] )
             case _:
                 print("%s [unknown message %s]" % (self.GS2, msg))
-    
+
 # Run parent instance tests
 def run_parent_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
     # Kick off a test 
@@ -251,99 +252,28 @@ def run_child_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
     # Kick off a test
     p = mp.Process(target=FrTest(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
     p.start()
- 
-# =======================================================================================   
-# Test entry point  
-if __name__ == '__main__':
-    
-    #===========================================================
-    # The one and only multiprocessing.Manager
-    mp_manager = mp.Manager()
-    # Make the shared dictionary
-    mp_dict = mp_manager.dict()
-    # Make a shared startup event
-    mp_event = mp_manager.Event()
-    
-    #===========================================================
-    # Define the local within machine processes
-    
-    # Tag LOCAL defines a list of process name against task names.
-    # TBD - put this in a config file
-    local_procs = [LOCAL, [["PARENT", ["A", "B"]],["CHILD", ["C", "D"]]]]
+
+def main():
+    # Do start-of-day processing
+    fm = framework_mgr.FrameworkMgr('E:\\Projects\\Framework\\trunk\\src\\python\\config\\framework.cfg')
+    r, global_cfg = fm.start_of_day()
+    local_procs = global_cfg[LOCAL]
+    remote_procs = global_cfg[REMOTE]
+    q_local_parent = global_cfg['PARENT']
+    q_local_children = global_cfg['CHILDREN']
+    mp_dict = global_cfg['DICT']
+    mp_event = global_cfg['EVENT']
+    # Split local procs
     expanded_local_procs = []
     for proc in local_procs[1]:
         expanded_local_procs.append([LOCAL, proc])
-    
-    # The first entry must be the initiating Python instance, subsequent
-    # entries are other Python instances on this machine.
-    
-    # We need a pair of multiprocessor.Queue between each communicating instance
-    # This could get complicated so in the interests of simplicity we limit the net
-    # between the main process and one child process. 
-    # The first in the pair listens for messages from 'name'.
-    # The second sends messages to 'name'.
-    # q_local will be of the form {name: {name: [task_name, task_name, ...]}, name: ...}
-    # The parent process wants all of the child q's for receive and send
-    # Each child wants the parent q's
-    q_local_children = {}
-    first = True
-    parent_name = ''
-    for proc in local_procs[1]:
-        q1 = mp.Queue()
-        q2 = mp.Queue()
-        if first:
-            # Main process
-            #q_local[proc[0]] = {proc[0]: [q2, q1]}
-            # Note name
-            parent_name = proc[0]
-            first = False
-        else:
-            # Child process
-            q_local_children[proc[0]] = {parent_name: [q1, q2]}
-
-    # We now have all the child procs with q's that point to the parent
-    # Add all q's to the parent but reverse the receive/send q's
-    q_local_parent = {}
-    for proc in q_local_children.keys():
-        q_local_parent[proc] = [q_local_children[proc][parent_name][1], q_local_children[proc][parent_name][0]]
-
-    # ===========================================================
-    # Define the remote machine processes
-    # Each machine has one IMC process which communicates on a pair or q's with all its processes which means processes have to read and put back if not for it.
-    # Tag REMOTE defines a list of process/device name against task names + connectivity information.
-    remote_procs = [REMOTE, [["DEVICE-A", ["E", "F"],"192,168.1.200", 10000, 10001]], ["DEVICE-B", ["G", "H"],"192,168.1.201", 10002, 10003]]
-    
-    # We need to create two mp queues for each process on the machine for the IMC messages
-    imc_qs = {}
-    for desc in remote_procs[1]:
-        imc_qs[desc[0]] = (mp.Queue(), mp.Queue())     
-    
-    # Make an IMC server which runs as a remote service
-    # Create ports list
-    # This is the ports to listen on
-    ports = []
-    for desc in remote_procs[1]:
-        ports.append(desc[3])
-    # Create queues
-    # there is an in and out q for each process on the machine
-    # {proc_name: (q, q), ...}
-    queues = {}
-    for proc in local_procs[1]:   
-        q1 = mp.Queue()
-        q2 = mp.Queue()
-        queues[proc[0]] = (q1, q2)
-    # Special control q
-    imc_ctl_q = mp.Queue()
-                
-    imc = mp.Process(target=imc_server.ImcServer(ports, queues, imc_ctl_q).run)
-    imc.start()
         
     # ========================================================
     # Run processes, starting on their own thread
     # main process
     t1 = threading.Thread(target=run_parent_process, args=(expanded_local_procs[0], remote_procs, q_local_parent, mp_dict, mp_event))
     t1.start()
-    #sleep(2)
+    
     # and a child process
     t2 = threading.Thread(target=run_child_process, args=(expanded_local_procs[1], remote_procs, q_local_children['CHILD'], mp_dict, mp_event))
     t2.start()
@@ -352,10 +282,14 @@ if __name__ == '__main__':
     # Ready to go
     mp_event.set()
     
-    # Wait for completion
+    # Wait for completion of startup tasks
     t1.join()
     t2.join()
-    # Need to terminate this somehow - send it a message on a special q
-    imc_ctl_q.put("QUIT")
-    imc.join()
-
+    # End-of-day processing
+    fm.end_of_day()
+    sleep(1)
+    print("Test Complete")
+    
+# Entry point   
+if __name__ == '__main__':
+    main()

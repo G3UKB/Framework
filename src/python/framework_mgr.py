@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# framework_init.py
+# framework_mgr.py
 #
-# Framework initialisation routines
+# Framework initialisation and closedown routines
 # 
 # Copyright (C) 2021 by G3UKB Bob Cowdery
 # This program is free software; you can redistribute it and/or modify
@@ -52,7 +52,7 @@ file for each will be different.
 """
 
 # Single class contains all startup routines
-class FrameworkInit:
+class FrameworkMgr:
     
     #==============================================================================================  
     def __init__(self, cfg):
@@ -60,6 +60,8 @@ class FrameworkInit:
         
         self.__local = None
         self.__remote = None
+        self.__is_local = False
+        self.__is_remote = False
      
     #==============================================================================================   
     # Call this after any startup local initialisation
@@ -72,13 +74,14 @@ class FrameworkInit:
             topology = self.__get_config(self.__cfg)
         except Exception as e:
             print('Problem reading configuratioon! [%s]' % str(e))
-            return False
+            return False, {}
         sections = topology.sections()
         if len(sections) == 0 or LOCAL not in sections:
             print('The configuration file appears to be empty or has no LOCAL section!')
-            return False
+            return False, {}
         try:
             if LOCAL in sections:
+                self.__is_local = True
                 print('Found LOCAL section, parsing processes...')
                 self.__local = ['LOCAL', []]
                 for key in topology['LOCAL']:
@@ -88,6 +91,7 @@ class FrameworkInit:
                     self.__local[1].append([key, tasks])
                     print('Found process %s with tasks %s' % ( key, tasks))
             if REMOTE in sections:
+                self.__is_remote = True
                 print('Found REMOTE section, parsing processes...')
                 self.__remote = ['REMOTE', []]
                 for key in topology['REMOTE']:
@@ -100,20 +104,20 @@ class FrameworkInit:
                     print('Found process %s with tasks %s and parameters %s, %s, %s' % ( key, tasks, ip, inport, outport))
         except Exception as e:
             print('There was a problem with the configuration [%s]' % str(e))
-            return False
+            return False, {}
 
         #===================================================================
         # Setup global Manager
         # The one and only multiprocessing.Manager
-        mp_manager = mp.Manager()
+        self.__mp_manager = mp.Manager()
         # Make the shared dictionary
-        mp_dict = mp_manager.dict()
+        self.__mp_dict = self.__mp_manager.dict()
         # Make a shared startup event
-        mp_event = mp_manager.Event()
+        self.__mp_event = self.__mp_manager.Event()
         
         #===================================================================
         # Create local q's
-        if LOCAL in sections:
+        if self.__is_local:
             #===================================================================
             # We need a pair of multiprocessor.Queue between each communicating instance
             # The first in the pair listens for messages from 'name'.
@@ -121,7 +125,7 @@ class FrameworkInit:
             # q_local will be of the form {name: {name: [task_name, task_name, ...]}, name: ...}
             # The parent process wants all of the child q's for receive and send
             # Each child wants the parent q's
-            q_local_children = {}
+            self.__q_local_children = {}
             first = True
             parent_name = ''
             for proc in self.__local[1]:
@@ -134,16 +138,17 @@ class FrameworkInit:
                     first = False
                 else:
                     # Child process
-                    q_local_children[proc[0]] = {parent_name: [q1, q2]}
+                    self.__q_local_children[proc[0]] = {parent_name: [q1, q2]}
         
             # We now have all the child procs with q's that point to the parent
             # Add all q's to the parent but reverse the receive/send q's
-            q_local_parent = {}
-            for proc in q_local_children.keys():
-                q_local_parent[proc] = [q_local_children[proc][parent_name][1], q_local_children[proc][parent_name][0]]
+            self.__q_local_parent = {}
+            for proc in self.__q_local_children.keys():
+                self.__q_local_parent[proc] = [self.__q_local_children[proc][parent_name][1], self.__q_local_children[proc][parent_name][0]]
     
         #===================================================================
         # Make an IMC server which runs as a remote service
+        if self.__is_remote:
             # Create ports list
             # This is the ports to listen on
             ports = []
@@ -158,10 +163,27 @@ class FrameworkInit:
                 q2 = mp.Queue()
                 queues[proc[0]] = (q1, q2)
             # Special control q
-            imc_ctl_q = mp.Queue()
+            self.__imc_ctl_q = mp.Queue()
                         
-            imc = mp.Process(target=imc_server.ImcServer(ports, queues, imc_ctl_q).run)
-            imc.start()
+            self.__imc = mp.Process(target=imc_server.ImcServer(ports, queues, self.__imc_ctl_q).run)
+            self.__imc.start()
+    
+        #===================================================================
+        # Return the startup objects
+        return True, {LOCAL: self.__local,
+                      REMOTE: self.__remote,
+                      'PARENT': self.__q_local_parent,
+                      'CHILDREN': self.__q_local_children,
+                      'DICT': self.__mp_dict,
+                      'EVENT': self.__mp_event}
+            
+    #==============================================================================================   
+    # Call this at end of dat
+    def end_of_day(self):
+        if self.__is_remote: 
+            # Send QUIT to imc control q
+            self.__imc_ctl_q.put("QUIT")
+            self.__imc.join()
     
     #==============================================================================================      
     # This reader ensures we retain the case of the options
