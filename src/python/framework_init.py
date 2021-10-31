@@ -54,37 +54,116 @@ file for each will be different.
 # Single class contains all startup routines
 class FrameworkInit:
     
+    #==============================================================================================  
     def __init__(self, cfg):
         self.__cfg = cfg
         
+        self.__local = None
+        self.__remote = None
+     
+    #==============================================================================================   
     # Call this after any startup local initialisation
     def start_of_day(self):
         # Where cfg is the fully qualified path to a configuration file
         
+        #===================================================================
         # Read the configuration
-        topology = self.__get_config(self.__cfg)
+        try:
+            topology = self.__get_config(self.__cfg)
+        except Exception as e:
+            print('Problem reading configuratioon! [%s]' % str(e))
+            return False
         sections = topology.sections()
-        if LOCAL in sections:
-            print('Found LOCAL section, parsing processes...')
-            local = ['LOCAL', []]
-            for key in topology['LOCAL']:
-                # Retrieve and split value
-                val = topology['LOCAL'][key]
-                tasks = val.strip().split(',')
-                local[1].append([key, tasks])
-                print('Found process %s with tasks %s' % ( key, tasks))
-        if REMOTE in sections:
-            print('Found REMOTE section, parsing processes...')
-            remote = ['REMOTE', []]
-            for key in topology['REMOTE']:
-                # Retrieve and split value
-                val = topology['REMOTE'][key]
-                tasks, params = val.split(':')
-                tasks = tasks.strip().split(',')
-                ip, inport, outport = params.strip().split(',')
-                remote[1].append([key, tasks, ip, int(inport), int(outport)])
-                print('Found process %s with tasks %s and parameters %s, %s, %s' % ( key, tasks, ip, inport, outport))
+        if len(sections) == 0 or LOCAL not in sections:
+            print('The configuration file appears to be empty or has no LOCAL section!')
+            return False
+        try:
+            if LOCAL in sections:
+                print('Found LOCAL section, parsing processes...')
+                self.__local = ['LOCAL', []]
+                for key in topology['LOCAL']:
+                    # Retrieve and split value
+                    val = topology['LOCAL'][key]
+                    tasks = val.strip().split(',')
+                    self.__local[1].append([key, tasks])
+                    print('Found process %s with tasks %s' % ( key, tasks))
+            if REMOTE in sections:
+                print('Found REMOTE section, parsing processes...')
+                self.__remote = ['REMOTE', []]
+                for key in topology['REMOTE']:
+                    # Retrieve and split value
+                    val = topology['REMOTE'][key]
+                    tasks, params = val.split(':')
+                    tasks = tasks.strip().split(',')
+                    ip, inport, outport = params.strip().split(',')
+                    self.__remote[1].append([key, tasks, ip, int(inport), int(outport)])
+                    print('Found process %s with tasks %s and parameters %s, %s, %s' % ( key, tasks, ip, inport, outport))
+        except Exception as e:
+            print('There was a problem with the configuration [%s]' % str(e))
+            return False
 
+        #===================================================================
+        # Setup global Manager
+        # The one and only multiprocessing.Manager
+        mp_manager = mp.Manager()
+        # Make the shared dictionary
+        mp_dict = mp_manager.dict()
+        # Make a shared startup event
+        mp_event = mp_manager.Event()
+        
+        #===================================================================
+        # Create local q's
+        if LOCAL in sections:
+            #===================================================================
+            # We need a pair of multiprocessor.Queue between each communicating instance
+            # The first in the pair listens for messages from 'name'.
+            # The second sends messages to 'name'.
+            # q_local will be of the form {name: {name: [task_name, task_name, ...]}, name: ...}
+            # The parent process wants all of the child q's for receive and send
+            # Each child wants the parent q's
+            q_local_children = {}
+            first = True
+            parent_name = ''
+            for proc in self.__local[1]:
+                q1 = mp.Queue()
+                q2 = mp.Queue()
+                if first:
+                    # Main process
+                    # Note name
+                    parent_name = proc[0]
+                    first = False
+                else:
+                    # Child process
+                    q_local_children[proc[0]] = {parent_name: [q1, q2]}
+        
+            # We now have all the child procs with q's that point to the parent
+            # Add all q's to the parent but reverse the receive/send q's
+            q_local_parent = {}
+            for proc in q_local_children.keys():
+                q_local_parent[proc] = [q_local_children[proc][parent_name][1], q_local_children[proc][parent_name][0]]
+    
+        #===================================================================
+        # Make an IMC server which runs as a remote service
+            # Create ports list
+            # This is the ports to listen on
+            ports = []
+            for desc in self.__remote[1]:
+                ports.append(desc[3])
+            # Create queues
+            # there is an in and out q for each process on the machine
+            # {proc_name: (q, q), ...}
+            queues = {}
+            for proc in self.__local[1]:   
+                q1 = mp.Queue()
+                q2 = mp.Queue()
+                queues[proc[0]] = (q1, q2)
+            # Special control q
+            imc_ctl_q = mp.Queue()
+                        
+            imc = mp.Process(target=imc_server.ImcServer(ports, queues, imc_ctl_q).run)
+            imc.start()
+    
+    #==============================================================================================      
     # This reader ensures we retain the case of the options
     # otherwise they are all converted to lower case
     def __get_config(self, cfg):
