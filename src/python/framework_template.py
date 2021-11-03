@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 #
-# framework_test.py
+# framework_template.py
 #
-# Framework test and example code
+# Framework starter code
 # 
 # Copyright (C) 2021 by G3UKB Bob Cowdery
 # This program is free software; you can redistribute it and/or modify
@@ -42,11 +42,9 @@ import forwarder
 import imc_server
 
 # ====================================================================
-# Test code
-# NOTE: This code uses the match keyword as we are trying to emulate a
-# receive loop and pattern matching is by far the most elegant way.
-# However, this needs Python 3.10 which as of writing is pre-release.
-# You don't need pattern matching, it's just tidier.
+# Starter code
+# This code is the simplest possible working framework which can be expanded
+# to the actual topology required for the application.
 
 class FrTest:
 
@@ -238,10 +236,16 @@ def run_child_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
     p = mp.Process(target=FrTest(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
     p.start()
 
-def main():
+# =======================================================================================================
+# Main path code to establish system
+def main(config_path):
+    
     # Do start-of-day processing
-    fm = framework_mgr.GlobalInit('E:\\Projects\\Framework\\trunk\\src\\python\\config\\framework_test.cfg')
+    # Create an instance of GlobalInit
+    fm = framework_mgr.GlobalInit(config_path)
+    # Run start of day code
     r, global_cfg = fm.start_of_day()
+    # Extract parameters from the global configuration response
     local_procs = global_cfg[LOCAL]
     remote_procs = global_cfg[REMOTE]
     q_local_parent = global_cfg['PARENT']
@@ -249,6 +253,8 @@ def main():
     mp_dict = global_cfg['DICT']
     mp_event = global_cfg['EVENT']
     # Split local procs
+    # The local procs can contain one or more processes with its task list
+    # We need these separated as each will be given to a separate process
     expanded_local_procs = []
     for proc in local_procs[1]:
         expanded_local_procs.append([LOCAL, proc])
@@ -274,7 +280,16 @@ def main():
     fm.end_of_day()
     sleep(1)
     print("Test Complete")
-    
+
+# =======================================================================================================    
 # Entry point   
 if __name__ == '__main__':
-    main()
+    # Check parameters
+    if len(sys.argv) != 2:
+        print("framework_template <full path to configuration file>")
+    else:
+        if os.path.isfile(sys.argv[1]):
+            # Enter main program
+            main(sys.argv[1])
+        else:
+            print("Configuration file at %s does not exist!" % argv[1])
