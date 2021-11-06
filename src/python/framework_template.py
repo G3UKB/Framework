@@ -59,10 +59,7 @@ class AppMain:
         
     # Entry point for process
     def run(self):
-        self.__name = self.__local[1][0]
-        self.GS1 = self.__tid[1][1][0]
-        self.GS2 = self.__tid[1][1][1]
-
+        
         # ======================================================
         # For each process we perform a process initialisation which does the boiler plate stuff
         fm = framework_mgr.ProcessInit(self.__local, self.__remote, self.__local_queues, self.__multiproc_dict)
@@ -74,20 +71,47 @@ class AppMain:
         router = params['ROUTER']       # The router reference
         self.__gs_inst = params['GS']   # Instance of the gen server class to manage gen server instances
         
-        # Print context
+        # ======================================================
+        # Get the local proc in a more usable state
+        # The local proc is of this form:
+        # If this is the parent process
+        #   ['LOCAL', ['PARENT', ['A', 'B']]]
+        # If this is a child process
+        #   ['LOCAL', ['CHILD', ['C', 'D']]]
+        # Extract our process name
+        self.__name = self.__local[1][0]
+        # Extract the task names for this process
+        # We will call the task names GS1 and GS2 for gen server 1 & 2
+        # Not every task has to be a gen server but it does make messaging somewhat easier
+        # We need to know what is in our task list as its application dependent.
+        GS1 = self.__local[1][1][0]
+        GS2 = self.__local[1][1][1]
+      
+        # Useful debug context
         #print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
         
-        # Following is test code as an example of usage
-        # Make 2 gen-servers
+        # Each gen server needs to know its task name and it needs a dispatcher to process
+        # and dispatch messages.
+        # We use the gs_inst to create new servers. We don't need a refernece as they are self
+        # managing.
         self.__gs_inst.server_new(self.GS1, self.gs1_dispatch)
         self.__gs_inst.server_new(self.GS2, self.gs2_dispatch)
         
-        # Regiater our thread for our process
+        # The gen servers start on their own thread. However we might want to send messages to this
+        # thread which is not a gen server and could be the main GUI thread.
+        # In order to do that we must register the thread with its name and dispatcher in much the same
+        # way as the gen servers. The difference is messages have to be pulled rather than being automatic.
+        # Register our thread for our process
+        # It also needs a q on which to receive messages
         q = queue.Queue()
         self.__gs_inst.server_reg(self.__name, None, self.main_dispatch, q)
         
-        # Wait for ready
+        # Now all the initialisation is done we wait for the start signal
         self.__mp_event.wait()
+        
+        # ======================================================
+        # The rest is the application so we jst send and receive a few messages to prove operation
+        # and to provide sample exchanges.
         
         # Send message to A and B from main thread
         self.__gs_inst.server_msg(self.GS1, ["Message 1 to %s" % self.GS1])

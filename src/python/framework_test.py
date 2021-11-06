@@ -52,6 +52,8 @@ class FrTest:
 
     def __init__(self, ar_task_ids, ar_imc_ids, qs, mp_dict, mp_event):
         
+        print("LOCAL ", ar_task_ids)
+
         # Save params
         self.__tid = ar_task_ids
         self.__imc = ar_imc_ids
@@ -243,6 +245,7 @@ def main():
     fm = framework_mgr.GlobalInit('E:\\Projects\\Framework\\trunk\\src\\python\\config\\framework_test.cfg')
     r, global_cfg = fm.start_of_day()
     local_procs = global_cfg[LOCAL]
+    print("ALL LOCAL ", local_procs)
     remote_procs = global_cfg[REMOTE]
     q_local_parent = global_cfg['PARENT']
     q_local_children = global_cfg['CHILDREN']
