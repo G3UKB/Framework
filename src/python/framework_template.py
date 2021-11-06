@@ -46,30 +46,33 @@ import imc_server
 # This code is the simplest possible working framework which can be expanded
 # to the actual topology required for the application.
 
-class FrTest:
+class AppMain:
 
-    def __init__(self, ar_task_ids, ar_imc_ids, qs, mp_dict, mp_event):
+    def __init__(self, local, remote, local_queues, multiproc_dict, multiproc_event):
         
         # Save params
-        self.__tid = ar_task_ids
-        self.__imc = ar_imc_ids
-        self.__qs = qs
-        self.__mp_dict = mp_dict
-        self.__mp_event = mp_event
+        self.__local = local
+        self.__remote = remote
+        self.__local_queues = local_queues
+        self.__multiproc_dict = multiproc_dict
+        self.__multiproc_event = multiproc_event
         
     # Entry point for process
     def run(self):
-        self.__name = self.__tid[1][0]
+        self.__name = self.__local[1][0]
         self.GS1 = self.__tid[1][1][0]
         self.GS2 = self.__tid[1][1][1]
 
         # ======================================================
-        # Perform process init
-        fm = framework_mgr.ProcessInit(self.__tid, self.__imc, self.__qs, self.__mp_dict)
+        # For each process we perform a process initialisation which does the boiler plate stuff
+        fm = framework_mgr.ProcessInit(self.__local, self.__remote, self.__local_queues, self.__multiproc_dict)
+        # Call start_of_day() to get the task data instance that tracks the tasks this instance creates and the
+        # router instance that merges together the data about which process containes which tasks and the
+        # associated queues for processes to communicate.
         params = fm.start_of_day()
-        td_man = params['TD']
-        router = params['ROUTER']
-        self.__gs_inst = params['GS']
+        td_man = params['TD']           # The task data manager
+        router = params['ROUTER']       # The router reference
+        self.__gs_inst = params['GS']   # Instance of the gen server class to manage gen server instances
         
         # Print context
         #print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
@@ -225,15 +228,16 @@ class FrTest:
             case _:
                 print("%s [unknown message %s]" % (self.GS2, msg))
 
-# Run parent instance tests
+# =======================================================================================================
+# Run parent instance
 def run_parent_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
-    # Kick off a test 
-    FrTest(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run()
+    # Directly call the main template code
+    AppMain(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run()
 
-# Run child instance tests
+# Run child instance
 def run_child_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
-    # Kick off a test
-    p = mp.Process(target=FrTest(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
+    # Run a separate instance of the main template code via multiprocessing
+    p = mp.Process(target=AppMain(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
     p.start()
 
 # =======================================================================================================
@@ -246,12 +250,12 @@ def main(config_path):
     # Run start of day code
     r, global_cfg = fm.start_of_day()
     # Extract parameters from the global configuration response
-    local_procs = global_cfg[LOCAL]
-    remote_procs = global_cfg[REMOTE]
-    q_local_parent = global_cfg['PARENT']
-    q_local_children = global_cfg['CHILDREN']
-    mp_dict = global_cfg['DICT']
-    mp_event = global_cfg['EVENT']
+    local_procs = global_cfg[LOCAL]             # All processes on this machine
+    remote_procs = global_cfg[REMOTE]           # All processes on other machines
+    q_local_parent = global_cfg['PARENT']       # The children q pairs given to the parent
+    q_local_children = global_cfg['CHILDREN']   # The parent q pair given to each child
+    mp_dict = global_cfg['DICT']                # The global dictionary for routing info
+    mp_event = global_cfg['EVENT']              # The global startup event
     # Split local procs
     # The local procs can contain one or more processes with its task list
     # We need these separated as each will be given to a separate process
@@ -260,26 +264,33 @@ def main(config_path):
         expanded_local_procs.append([LOCAL, proc])
         
     # ========================================================
-    # Run processes, starting on their own thread
-    # main process
+    # Run processes
+    # It usually makes sense to run the child processes first and then start the main process loop, especially if its a GUI
+    # process. Otherwise it can be simpler to make another thread the main process thread then just wait for things to
+    # terminate here.
+    
+    # The first process in the list should probably be the main process otherwise look for a specific name.
+    # Start the main process via a thread.
     t1 = threading.Thread(target=run_parent_process, args=(expanded_local_procs[0], remote_procs, q_local_parent, mp_dict, mp_event))
     t1.start()
     
-    # and a child process
+    # Start any child processes via another thread.
     t2 = threading.Thread(target=run_child_process, args=(expanded_local_procs[1], remote_procs, q_local_children['CHILD'], mp_dict, mp_event))
     t2.start()
     sleep(1)
     
-    # Ready to go
+    # We don't want things to start until all processes have done initialisation.
+    # At the appropriate point a process should wait on the global event
     mp_event.set()
     
-    # Wait for completion of startup tasks
+    # Wait for completion of processes
     t1.join()
     t2.join()
+    
     # End-of-day processing
     fm.end_of_day()
     sleep(1)
-    print("Test Complete")
+    print("Template run complete")
 
 # =======================================================================================================    
 # Entry point   
