@@ -111,7 +111,7 @@ class AppMain:
         self.__mp_event.wait()
         
         # ======================================================
-        # The rest is the application so
+        # The rest is application specific so ...
         # Just send and receive a few messages to prove operation and to provide sample exchanges.
         
         # Send one way message to our gen servers from main thread (A&B or C&D)
@@ -144,6 +144,9 @@ class AppMain:
             print(resp)
             resp = self.__gs_inst.server_response_get(self.__name)
         
+        # Finally send message to remote system
+        
+        
         # Subscribe A & B to a topic
         #ps.ps_subscribe( "GS1", "TOPIC-1")
         #ps.ps_subscribe( "GS2", "TOPIC-1")
@@ -167,6 +170,8 @@ class AppMain:
     # Dispatcher for main thread
     def main_dispatch(self, msg):
         # We expect two message types from each local gen server
+        # We need to match on the exact message text but in reality could be
+        # on a msg id as the data is opaque to the framework.
         class MSGS(Enum):
             MSG = "Message to %s" % (self.__name)
         match msg:
