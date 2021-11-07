@@ -104,40 +104,41 @@ class AppMain:
         # Register our thread for our process
         # It also needs a q on which to receive messages
         q = queue.Queue()
+        # We register the main thread (task) as its own process name for messaging
         self.__gs_inst.server_reg(self.__name, None, self.main_dispatch, q)
         
         # Now all the initialisation is done we wait for the start signal
         self.__mp_event.wait()
         
         # ======================================================
-        # The rest is the application so we jst send and receive a few messages to prove operation
-        # and to provide sample exchanges.
+        # The rest is the application so
+        # Just send and receive a few messages to prove operation and to provide sample exchanges.
         
-        # Send message to A and B from main thread
-        self.__gs_inst.server_msg(self.GS1, ["Message 1 to %s" % self.GS1])
-        self.__gs_inst.server_msg(self.GS2, ["Message 1 to %s" % self.GS2])
-        self.__gs_inst.server_msg(self.GS1, ["Message 2 to %s" % self.GS1])
-        self.__gs_inst.server_msg(self.GS2, ["Message 2 to %s" % self.GS2])
+        # Send one way message to our gen servers from main thread (A&B or C&D)
+        self.__gs_inst.server_msg(self.GS1, ["Message to %s" % self.GS1])
+        self.__gs_inst.server_msg(self.GS2, ["Message to %s" % self.GS2])
         
-        # Try message to C
+        # Now send one way message from main thread, parent -> child or child -> parent
         if self.__name == "PARENT":
-            # This is A and B servers so try a send to C
+            # This is parent so A and B gen servers, so send to C
             self.__gs_inst.server_msg("C", ["Interprocess to C from %s" % self.__name])
         else:
-            # This is B and C severs so try a send to A
+            # This is child so B and C gen servers, so send to A
             self.__gs_inst.server_msg("A", ["Interprocess to A from %s" % self.__name])
         
-        # Retrieve messages for us
+        # In this example the gen servers send a one way message back to this thread
+        # As we are not a gen server we have to manually retrieve messages using our task name
         msg = self.__gs_inst.server_msg_get(self.__name)
         while msg != None:
             print(msg)
             msg = self.__gs_inst.server_msg_get(self.__name)
         
-        # Send message to A and B from main thread that require a response
+        # Now send message from main thread to our gen servers that require a response
+        # For a response we simply add the name of the task to reply to
         self.__gs_inst.server_msg(self.GS1, [self.__name, "Message to %s expects response" % self.GS1])
         self.__gs_inst.server_msg(self.GS2, [self.__name, "Message to %s expects response" % self.GS2])
         
-        # Retrieve responses for us
+        # As we now expect a response retrieve our messages as before
         resp = self.__gs_inst.server_response_get(self.__name)
         while resp != None:
             print(resp)
@@ -153,11 +154,12 @@ class AppMain:
         # Get topic list
         #print("Subscribers: ", ps.ps_list("TOPIC-1"))
         
-        # Terminate servers
+        # ======================================================
+        # Clean up
         sleep(1)
-        #fwds.terminate()
-        #fwds.join()
+        # Do framework manager end of day
         fm.end_of_day()
+        # Terminate all our gen servers
         self.__gs_inst.server_term_all()
         
     def main_dispatch(self, msg):
