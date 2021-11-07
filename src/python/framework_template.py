@@ -161,34 +161,40 @@ class AppMain:
         fm.end_of_day()
         # Terminate all our gen servers
         self.__gs_inst.server_term_all()
-        
+     
+    # ======================================================
+    # Start dispatch methods
+    # Dispatcher for main thread
     def main_dispatch(self, msg):
+        # We expect two message types from each local gen server
         class MSGS(Enum):
-            MSG1 = "Message 1 to %s" % (self.__name)
-            MSG2 = "Message 2 to %s" % (self.__name)
+            MSG = "Message to %s" % (self.__name)
         match msg:
             case [data]:
+                # Local one way message
                 match data:
-                    case MSGS.MSG1.value:
-                        print("%s Message 1 ", (self.__name, data))
-                    case MSGS.MSG2.value:
-                        print("%s Message 2 ", (self.__name, data))
-            # Does message need a response
+                    case MSGS.MSG.value:
+                        print("%s Message ", (self.__name, data))
             case [sender, data]:
-                print("%s [%s, %s] " % (self.__name, sender, data))
+                # RPC type message that requires a response
+                print("%s RPC [%s, %s] " % (self.__name, sender, data))
+                # Send response to sender
                 self.__gs_inst.server_response( sender, "Response to %s from %s" % (sender, self.__name) )
             case _:
+                # Message not understood
                 print("%s [unknown message %s]" % (self.__name, msg)) 
     
+    # ======================================================
+    # Dispatcher for gen server 1
     def gs1_dispatch(self, msg):
         class MSGS(Enum):
-            MSG1 = "Message 1 to %s" % (self.GS1)
-            MSG2 = "Message 2 to %s" % (self.GS1)
-            MSG3 = "Message to %s from %s[1]" % (self.GS1, self.GS2)
-            MSG4 = "Message to %s from %s[2]" % (self.GS1, self.GS2)
+            MSG1 = "Message to %s" % (self.GS1)
+            MSG2 = "Message to %s from %s" % (self.GS1, self.GS2)
         
         match msg:
             case "INIT":
+                # Each dispatcher receives an INIT message at start of day
+                # so it can perform any necessary initialisation
                 print("INIT %s" % self.GS1)
             case [data]:
                 match data:
@@ -219,6 +225,8 @@ class AppMain:
             case _:
                 print("%s [unknown message %s]" % (self.GS1, msg)) 
     
+    # ======================================================
+    # Dispatcher for gen server 2
     def gs2_dispatch(self, msg):
         class MSGS(Enum):
             MSG1 = "Message 1 to %s" % (self.GS2)
