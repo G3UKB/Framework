@@ -166,8 +166,7 @@ class GenServer:
     def server_msg(self, name, message):
         item = self.__td_man.get_task_ref(name)
         if item == None:
-            # Which process is the message destination
-            # Change to send to q or IP
+            # Get the associated q for the task
             q = self.get_target(name)
             if q != None:
                 # Forward the message to the process q
