@@ -144,9 +144,31 @@ class AppMain:
             print(resp)
             resp = self.__gs_inst.server_response_get(self.__name)
         
-        # Finally send message to remote system
+        # ======================================================
+        # Finally send message to remote system(s)
+        # A remote connection is defined as e.g. PARENT-A = E,F:192.168.1.200,10000,10001
+        # The name is the process name and must be the same as the local process name
+        # on that machine. There is one descriptor for each remote process
+        # When we send a message to a task on a remote process we only need to use the task
+        # name so from the application viewpoint there is no difference between local and remote.
+        # However, it is a send and forget message unless it needs a reply so if the other end is
+        # not listening there will be no error or a timeout on the reply.
         
+        # One-way message
+        self.__gs_inst.server_msg("E", ["Intermachine to E from %s" % self.__name])
+        # Response expected
+        self.__gs_inst.server_msg("G", [self.__name, "Intermachine to G from %s expects response" % self.__name])
         
+        # As we now expect a response retrieve our messages as before
+        resp = self.__gs_inst.server_response_get(self.__name)
+        while resp != None:
+            print(resp)
+            resp = self.__gs_inst.server_response_get(self.__name)
+        
+        # ======================================================
+        # use the higher level publish/subscribe system
+        # This uses the underlying gen server messaging system but decouples the sender and
+        # receiver.
         # Subscribe A & B to a topic
         #ps.ps_subscribe( "GS1", "TOPIC-1")
         #ps.ps_subscribe( "GS2", "TOPIC-1")
