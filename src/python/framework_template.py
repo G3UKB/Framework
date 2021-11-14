@@ -115,8 +115,8 @@ class AppMain:
         # Just send and receive a few messages to prove operation and to provide sample exchanges.
         
         # Send one way message to our gen servers from main thread (A&B or C&D)
-        self.__gs_inst.server_msg(self.GS1, ["Message to %s from %s" % (self.GS1, self.__name)])
-        self.__gs_inst.server_msg(self.GS2, ["Message to %s from %s" % (self.GS2, self.__name)])
+        self.__gs_inst.server_msg(self.GS1, ["Message to %s from %s main thread" % (self.GS1, self.__name)])
+        self.__gs_inst.server_msg(self.GS2, ["Message to %s from %s main thread" % (self.GS2, self.__name)])
         
         """
         # Now send one way message from main thread, parent -> child or child -> parent
@@ -216,8 +216,8 @@ class AppMain:
     # Dispatcher for gen server 1
     def gs1_dispatch(self, msg):
         class MSGS(Enum):
-            MSG1 = "Message to %s from PARENT" % (self.GS1)
-            MSG2 = "Message to %s from CHILD" % (self.GS1)
+            MSG1 = "Message to %s from PARENT main thread" % (self.GS1)
+            MSG2 = "Message to %s from CHILD main thread" % (self.GS1)
             #MSG2 = "Message to %s from %s" % (self.GS1, self.GS2)
         
         match msg:
@@ -258,8 +258,8 @@ class AppMain:
     # Dispatcher for gen server 2
     def gs2_dispatch(self, msg):
         class MSGS(Enum):
-            MSG1 = "Message to %s from PARENT" % (self.GS2)
-            MSG2 = "Message to %s from CHILD" % (self.GS2)
+            MSG1 = "Message to %s from PARENT main thread" % (self.GS2)
+            MSG2 = "Message to %s from CHILD main thread" % (self.GS2)
             #MSG3 = "Message to %s from %s[1]" % (self.GS2, self.GS1)
             #MSG4 = "Message to %s from %s[2]" % (self.GS2, self.GS1)
             
