@@ -115,9 +115,10 @@ class AppMain:
         # Just send and receive a few messages to prove operation and to provide sample exchanges.
         
         # Send one way message to our gen servers from main thread (A&B or C&D)
-        self.__gs_inst.server_msg(self.GS1, ["Message to %s" % self.GS1])
-        self.__gs_inst.server_msg(self.GS2, ["Message to %s" % self.GS2])
+        self.__gs_inst.server_msg(self.GS1, ["Message to %s from %s" % (self.GS1, self.__name)])
+        self.__gs_inst.server_msg(self.GS2, ["Message to %s from %s" % (self.GS2, self.__name)])
         
+        """
         # Now send one way message from main thread, parent -> child or child -> parent
         if self.__name == "PARENT":
             # This is parent so A and B gen servers, so send to C
@@ -143,7 +144,7 @@ class AppMain:
         while resp != None:
             print(resp)
             resp = self.__gs_inst.server_response_get(self.__name)
-        
+        """
         # ======================================================
         # Finally send message to remote system(s)
         # A remote connection is defined as e.g. PARENT-A = E,F:192.168.1.200,10000,10001
@@ -215,8 +216,9 @@ class AppMain:
     # Dispatcher for gen server 1
     def gs1_dispatch(self, msg):
         class MSGS(Enum):
-            MSG1 = "Message to %s" % (self.GS1)
-            MSG2 = "Message to %s from %s" % (self.GS1, self.GS2)
+            MSG1 = "Message to %s from PARENT" % (self.GS1)
+            MSG2 = "Message to %s from CHILD" % (self.GS1)
+            #MSG2 = "Message to %s from %s" % (self.GS1, self.GS2)
         
         match msg:
             case "INIT":
@@ -227,20 +229,22 @@ class AppMain:
                 match data:
                     case MSGS.MSG1.value:
                         print("%s - Message [%s]" % (self.GS1, str(data)))
-                        self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[1]" % (self.__name, self.GS1)] )
-                        self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[1]" % (self.GS2, self.GS1)] )
+                        #self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[1]" % (self.__name, self.GS1)] )
+                        #self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[1]" % (self.GS2, self.GS1)] )
                     case MSGS.MSG2.value:
-                        print("%s - Message 2 [%s]" % (self.GS1, str(data)))
-                        self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[2]" % (self.__name, self.GS1)] )
-                        self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[2]" % (self.GS2, self.GS1)] )
-                    case "Interprocess to A from CHILD":
-                        print("Got - Interprocess to A from CHILD")
-                    case "Interprocess to C from PARENT":
-                        print("Got - Interprocess to C from PARENT")
-                    case MSGS.MSG4.value:
-                        print("%s-%s [2]" % (self.GS2, self.GS1))
-                    case "Publish to TOPIC-1":
-                        print("%s - Got TOPIC-1" % self.GS1)
+                        print("%s - Message [%s]" % (self.GS1, str(data)))
+                    #case MSGS.MSG2.value:
+                    #    print("%s - Message 2 [%s]" % (self.GS1, str(data)))
+                    #    self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[2]" % (self.__name, self.GS1)] )
+                    #    self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[2]" % (self.GS2, self.GS1)] )
+                    #case "Interprocess to A from CHILD":
+                    #    print("Got - Interprocess to A from CHILD")
+                    #case "Interprocess to C from PARENT":
+                    #    print("Got - Interprocess to C from PARENT")
+                    #case MSGS.MSG4.value:
+                    #    print("%s-%s [2]" % (self.GS2, self.GS1))
+                    #case "Publish to TOPIC-1":
+                    #    print("%s - Got TOPIC-1" % self.GS1)
                     case _:
                         print("%s [unknown message %s]" % (self.GS1, msg))
             # Does message need a response
@@ -254,10 +258,10 @@ class AppMain:
     # Dispatcher for gen server 2
     def gs2_dispatch(self, msg):
         class MSGS(Enum):
-            MSG1 = "Message 1 to %s" % (self.GS2)
-            MSG2 = "Message 2 to %s" % (self.GS2)
-            MSG3 = "Message to %s from %s[1]" % (self.GS2, self.GS1)
-            MSG4 = "Message to %s from %s[2]" % (self.GS2, self.GS1)
+            MSG1 = "Message to %s from PARENT" % (self.GS2)
+            MSG2 = "Message to %s from CHILD" % (self.GS2)
+            #MSG3 = "Message to %s from %s[1]" % (self.GS2, self.GS1)
+            #MSG4 = "Message to %s from %s[2]" % (self.GS2, self.GS1)
             
         match msg:
             case "INIT":
@@ -265,19 +269,21 @@ class AppMain:
             case [data]:
                 match data:
                     case MSGS.MSG1.value:
-                        print("%s Message 1 [%s]" % (self.GS2, str(data)))
-                        self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[1]" % (self.__name, self.GS2)] )
-                        self.__gs_inst.server_msg( self.GS1, ["Message to %s from %s[1]" % (self.GS1, self.GS2)] )
+                        print("%s - Message [%s]" % (self.GS2, str(data)))
+                        #self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[1]" % (self.__name, self.GS2)] )
+                        #self.__gs_inst.server_msg( self.GS1, ["Message to %s from %s[1]" % (self.GS1, self.GS2)] )
                     case MSGS.MSG2.value:
-                        print("%s Message 2 [%s]" % (self.GS2, str(data)))
-                        self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[2]" % (self.__name, self.GS2)] )
-                        self.__gs_inst.server_msg( self.GS1, ["Message to %s from %s[2]" % (self.GS1, self.GS2)] )
-                    case MSGS.MSG3.value:
-                        print("%s-%s [1]" % (self.GS1, self.GS2))
-                    case MSGS.MSG4.value:
-                        print("%s-%s [2]" % (self.GS1, self.GS2))
-                    case "Publish to TOPIC-1":
-                        print("%s - Got TOPIC-1" % self.GS2)
+                        print("%s - Message [%s]" % (self.GS2, str(data)))
+                    #case MSGS.MSG2.value:
+                    #    print("%s Message 2 [%s]" % (self.GS2, str(data)))
+                    #    self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[2]" % (self.__name, self.GS2)] )
+                    #    self.__gs_inst.server_msg( self.GS1, ["Message to %s from %s[2]" % (self.GS1, self.GS2)] )
+                    #case MSGS.MSG3.value:
+                    #    print("%s-%s [1]" % (self.GS1, self.GS2))
+                    #case MSGS.MSG4.value:
+                    #    print("%s-%s [2]" % (self.GS1, self.GS2))
+                    #case "Publish to TOPIC-1":
+                    #    print("%s - Got TOPIC-1" % self.GS2)
                     case _:
                         print("%s [unknown message %s]" % (self.GS2, msg))
             # Does message need a response
