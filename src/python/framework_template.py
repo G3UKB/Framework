@@ -24,7 +24,7 @@
 #
 
 # System imports
-import os
+import os, sys
 import multiprocessing as mp
 import threading
 import queue
@@ -84,8 +84,8 @@ class AppMain:
         # We will call the task names GS1 and GS2 for gen server 1 & 2
         # Not every task has to be a gen server but it does make messaging somewhat easier
         # We need to know what is in our task list as its application dependent.
-        GS1 = self.__local[1][1][0]
-        GS2 = self.__local[1][1][1]
+        self.GS1 = self.__local[1][1][0]
+        self.GS2 = self.__local[1][1][1]
       
         # Useful debug context
         #print("Context: ", os.getpid(), self.__name, router.get_routes(), self.__qs, sep=' ')
@@ -108,7 +108,7 @@ class AppMain:
         self.__gs_inst.server_reg(self.__name, None, self.main_dispatch, q)
         
         # Now all the initialisation is done we wait for the start signal
-        self.__mp_event.wait()
+        self.__multiproc_event.wait()
         
         # ======================================================
         # The rest is application specific so ...
@@ -155,15 +155,15 @@ class AppMain:
         # not listening there will be no error or a timeout on the reply.
         
         # One-way message
-        self.__gs_inst.server_msg("E", ["Intermachine to E from %s" % self.__name])
+        #self.__gs_inst.server_msg("E", ["Intermachine to E from %s" % self.__name])
         # Response expected
-        self.__gs_inst.server_msg("G", [self.__name, "Intermachine to G from %s expects response" % self.__name])
+        #self.__gs_inst.server_msg("G", [self.__name, "Intermachine to G from %s expects response" % self.__name])
         
         # As we now expect a response retrieve our messages as before
-        resp = self.__gs_inst.server_response_get(self.__name)
-        while resp != None:
-            print(resp)
-            resp = self.__gs_inst.server_response_get(self.__name)
+        #resp = self.__gs_inst.server_response_get(self.__name)
+        #while resp != None:
+        #    print(resp)
+        #    resp = self.__gs_inst.server_response_get(self.__name)
         
         # ======================================================
         # use the higher level publish/subscribe system
@@ -226,15 +226,13 @@ class AppMain:
             case [data]:
                 match data:
                     case MSGS.MSG1.value:
-                        print("%s - Message 1 [%s]" % (self.GS1, str(data)))
+                        print("%s - Message [%s]" % (self.GS1, str(data)))
                         self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[1]" % (self.__name, self.GS1)] )
                         self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[1]" % (self.GS2, self.GS1)] )
                     case MSGS.MSG2.value:
                         print("%s - Message 2 [%s]" % (self.GS1, str(data)))
                         self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[2]" % (self.__name, self.GS1)] )
                         self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[2]" % (self.GS2, self.GS1)] )
-                    case MSGS.MSG3.value:
-                        print("%s-%s [1]" % (self.GS2, self.GS1))
                     case "Interprocess to A from CHILD":
                         print("Got - Interprocess to A from CHILD")
                     case "Interprocess to C from PARENT":
@@ -364,4 +362,4 @@ if __name__ == '__main__':
             # Enter main program
             main(sys.argv[1])
         else:
-            print("Configuration file at %s does not exist!" % argv[1])
+            print("Configuration file at %s does not exist!" % sys.argv[1])

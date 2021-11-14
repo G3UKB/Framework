@@ -153,22 +153,26 @@ class GlobalInit:
         if self.__is_remote:
             # Create ports list
             # This is the ports to listen on
+            # Ports can be repeated if there are multiple processes on a node
+            # We only want to have each listen port once
             ports = []
             for desc in self.__remote[1]:
-                ports.append(desc[3])
+                if desc[3] not in ports:
+                    ports.append(desc[3])
             # Create queues
-            # there is an in and out q for each process on the machine
+            # there is an in and out q for each process on this machine
+            # to talk to the IMC server
             # {proc_name: (q, q), ...}
             queues = {}
             for proc in self.__local[1]:   
                 q1 = mp.Queue()
                 q2 = mp.Queue()
                 queues[proc[0]] = (q1, q2)
-            # Special control q
+            # Special control q to send control messages
             self.__imc_ctl_q = mp.Queue()
-                        
-            self.__imc = mp.Process(target=imc_server.ImcServer(ports, queues, self.__imc_ctl_q).run)
-            self.__imc.start()
+            # Create and start the IMC process            
+            #self.__imc = mp.Process(target=imc_server.ImcServer(ports, queues, self.__imc_ctl_q).run)
+            #self.__imc.start()
     
         #===================================================================
         # Return the startup objects
@@ -182,10 +186,11 @@ class GlobalInit:
     #==============================================================================================   
     # Call this at end of day
     def end_of_day(self):
-        if self.__is_remote: 
+        #if self.__is_remote: 
             # Send QUIT to imc control q
-            self.__imc_ctl_q.put("QUIT")
-            self.__imc.join()
+        #    self.__imc_ctl_q.put("QUIT")
+        #    self.__imc.join()
+        pass
     
     #==============================================================================================      
     # This reader ensures we retain the case of the options
