@@ -118,15 +118,15 @@ class AppMain:
         self.__gs_inst.server_msg(self.GS1, ["Message to %s from %s main thread" % (self.GS1, self.__name)])
         self.__gs_inst.server_msg(self.GS2, ["Message to %s from %s main thread" % (self.GS2, self.__name)])
         
-        """
         # Now send one way message from main thread, parent -> child or child -> parent
         if self.__name == "PARENT":
             # This is parent so A and B gen servers, so send to C
-            self.__gs_inst.server_msg("C", ["Interprocess to C from %s" % self.__name])
+            self.__gs_inst.server_msg("C", ["Interprocess to C from %s main thread" % self.__name])
         else:
             # This is child so B and C gen servers, so send to A
-            self.__gs_inst.server_msg("A", ["Interprocess to A from %s" % self.__name])
+            self.__gs_inst.server_msg("A", ["Interprocess to A from %s main thread" % self.__name])
         
+        """
         # In this example the gen servers send a one way message back to this thread
         # As we are not a gen server we have to manually retrieve messages using our task name
         msg = self.__gs_inst.server_msg_get(self.__name)
@@ -237,10 +237,10 @@ class AppMain:
                     #    print("%s - Message 2 [%s]" % (self.GS1, str(data)))
                     #    self.__gs_inst.server_msg( self.__name, ["Message to %s from %s[2]" % (self.__name, self.GS1)] )
                     #    self.__gs_inst.server_msg( self.GS2, ["Message to %s from %s[2]" % (self.GS2, self.GS1)] )
-                    #case "Interprocess to A from CHILD":
-                    #    print("Got - Interprocess to A from CHILD")
-                    #case "Interprocess to C from PARENT":
-                    #    print("Got - Interprocess to C from PARENT")
+                    case "Interprocess to A from CHILD main thread":
+                        print("%s - %s" % (self.GS1, str(data)))
+                    case "Interprocess to C from PARENT main thread":
+                        print("%s - %s" % (self.GS1, str(data)))
                     #case MSGS.MSG4.value:
                     #    print("%s-%s [2]" % (self.GS2, self.GS1))
                     #case "Publish to TOPIC-1":
