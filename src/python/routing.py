@@ -59,7 +59,6 @@ class Routing:
         # {process-name: (q1,q2), process_name: (...), ..., "IMC": (q3,)}
         # Such that the process is the target and the queues are q1 = input, q2 = output
         # For remote targets there is only one q which is the local q to send to the imc_server
-        
         self.__routes = router
         self.__lk = Lock()
         self.__qs = qs
