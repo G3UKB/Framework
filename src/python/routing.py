@@ -26,6 +26,7 @@
 # System imports
 from multiprocessing import Manager, Lock
 from time import sleep
+import pprint
 
 # Application imports
 from defs import *
@@ -65,6 +66,8 @@ class Routing:
     
     # Add a new route    
     def add_route(self, target, desc):
+        #print('add_route ', target, desc)
+        
         # target can be LOCAL or REMOTE
         # The descriptor can contain
         #   [proc_name, [[task_name, task_name, ...]]
@@ -75,8 +78,9 @@ class Routing:
         # Dict is a proxy, can't just append to elements
         if target in self.__routes:
             current = copy.deepcopy(self.__routes[target])
-            current.append(desc)
-            self.__routes[target] = current
+            if desc not in current:
+                current.append(desc)
+                self.__routes[target] = current
         else:
             self.__routes[target] = [desc]
         self.__lk.release()

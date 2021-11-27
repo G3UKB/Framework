@@ -161,13 +161,13 @@ class GlobalInit:
                     ports.append(desc[3])
             # Create queues
             # there is an in and out q for each process on this machine
-            # to talk to the IMC server
+            # to talk to the IMC server. These must be added to the router.
             # {proc_name: (q, q), ...}
-            queues = {}
+            self.__imc_queues = {}
             for proc in self.__local[1]:   
                 q1 = mp.Queue()
                 q2 = mp.Queue()
-                queues[proc[0]] = (q1, q2)
+                self.__imc_queues[proc[0]] = (q1, q2)
             # Special control q to send control messages
             self.__imc_ctl_q = mp.Queue()
             # Create and start the IMC process            
@@ -178,6 +178,7 @@ class GlobalInit:
         # Return the startup objects
         return True, {LOCAL: self.__local,
                       REMOTE: self.__remote,
+                      'IMC-QS': self.__imc_queues
                       'PARENT': self.__q_local_parent,
                       'CHILDREN': self.__q_local_children,
                       'DICT': self.__mp_dict,

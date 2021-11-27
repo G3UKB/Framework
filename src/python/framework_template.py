@@ -30,6 +30,7 @@ import threading
 import queue
 from time import sleep
 from enum import Enum
+import pprint
 
 # Application imports
 from defs import *
@@ -156,7 +157,7 @@ class AppMain:
         # not listening there will be no error or a timeout on the reply.
         
         # One-way message
-        #self.__gs_inst.server_msg("E", ["Intermachine to E from %s" % self.__name])
+        self.__gs_inst.server_msg("E", ["Intermachine to E from %s" % self.__name])
         # Response expected
         #self.__gs_inst.server_msg("G", [self.__name, "Intermachine to G from %s expects response" % self.__name])
         
@@ -313,6 +314,7 @@ def main(config_path):
     # Extract parameters from the global configuration response
     local_procs = global_cfg[LOCAL]             # All processes on this machine
     remote_procs = global_cfg[REMOTE]           # All processes on other machines
+    q_imc = global_cfg('IMC_QS')                # Q's to talk to IMC server
     q_local_parent = global_cfg['PARENT']       # The children q pairs given to the parent
     q_local_children = global_cfg['CHILDREN']   # The parent q pair given to each child
     mp_dict = global_cfg['DICT']                # The global dictionary for routing info
@@ -329,6 +331,8 @@ def main(config_path):
     # It usually makes sense to run the child processes first and then start the main process loop, especially if its a GUI
     # process. Otherwise it can be simpler to make another thread the main process thread then just wait for things to
     # terminate here.
+    
+    # *******TODO Give IMC q's and put them to the router
     
     # The first process in the list should probably be the main process otherwise look for a specific name.
     # Start the main process via a thread.
