@@ -41,7 +41,7 @@ import td_manager
 # The imc task
 class ImcServer():
     
-    def __init__(self, router, ports, queues, ctl_q):
+    def __init__(self, ports, queues, ctl_q):
         super(ImcServer, self).__init__()
         
         # ports - are a list of ports on which to listen
@@ -54,7 +54,6 @@ class ImcServer():
         #       ["192,168.1.200", 10000, [data to be dispatched]]
         #   we send the data message to the given end point.
         
-        self.__router = router
         self.__qs = queues
         self.__ports = ports
         self.__ctl_q = ctl_q
@@ -63,9 +62,9 @@ class ImcServer():
         # Open and bind sockets
         self.__rlist = []
         for port in self.__ports:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            self.__rlist.append(s)
-            s.bind(('', port))
+            self.__s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            self.__rlist.append(self.__s)
+            self.__s.bind(('', port))
         
     def terminate(self):
         self.__term = True
@@ -79,6 +78,10 @@ class ImcServer():
                 for s in r:
                     data, _ = s.recvfrom(512)
                     data = pickle.loads(data)
+                    print('Got: ', data)
+                    # Expect enough info here to dispatch correctly
+                    # Need to think about this!!
+                    # Can run both on same machine as they loop back.
                     [proc, data] = data
                     # Dispatch on the output q
                     self.__qs[proc][1].put(data)
@@ -89,10 +92,10 @@ class ImcServer():
                     except Exception as err:
                         continue
                     # Data is of the form [task-name, [message, ip, port]]
-                    task-name, [message, ip, port] = data
+                    task_name, [message, ip, port] = data
                     message = pickle.dumps(message)
                     # Send message
-                    s.sendto(message, (ip, port))
+                    self.__s.sendto(message, (ip, port))
             try:
                 data = self.__ctl_q.get(block=False)
                 if data =="QUIT":

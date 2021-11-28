@@ -142,15 +142,20 @@ class Routing:
  
     # Is this task remote
     def is_remote(self, task):
+        self.__lk.acquire()
+        r = False
+        routes = copy.deepcopy(self.__routes)
         for process in routes[REMOTE]:
             if task in process[1]:
-                return True
-        return False 
+                r = True
+        self.__lk.release()
+        return r
         
     # Return network address for given task
     def address_for_task(self, task):
         r = []
         self.__lk.acquire()
+        routes = copy.deepcopy(self.__routes)
         # Can't directly iterate a proxy
         # This is a simple work round as the dict is small
         routes = copy.deepcopy(self.__routes)
