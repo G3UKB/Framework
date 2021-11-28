@@ -300,7 +300,7 @@ def run_parent_process(ar_task_ids, ar_imc_ids, d_imc_qs, d_process_qs, mp_dict,
 # Run child instance
 def run_child_process(ar_task_ids, ar_imc_ids, d_imc_qs, d_process_qs, mp_dict, mp_event):
     # Run a separate instance of the main template code via multiprocessing
-    p = mp.Process(target=AppMain(ar_task_ids, d_imc_qs, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
+    p = mp.Process(target=AppMain(ar_task_ids, ar_imc_ids, d_imc_qs, d_process_qs, mp_dict, mp_event).run)
     p.start()
 
 # =======================================================================================================
@@ -315,7 +315,7 @@ def main(config_path):
     # Extract parameters from the global configuration response
     local_procs = global_cfg[LOCAL]             # All processes on this machine
     remote_procs = global_cfg[REMOTE]           # All processes on other machines
-    q_imc = global_cfg('IMC_QS')                # Q's to talk to IMC server
+    q_imc = global_cfg['IMC']                   # Q's to talk to IMC server
     q_local_parent = global_cfg['PARENT']       # The children q pairs given to the parent
     q_local_children = global_cfg['CHILDREN']   # The parent q pair given to each child
     mp_dict = global_cfg['DICT']                # The global dictionary for routing info

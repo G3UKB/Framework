@@ -87,6 +87,7 @@ class ImcServer():
                         data = q[0].get(block=False)
                     except Exception as err:
                         continue
+                    print('Got ', data)
                     data = pickle.dumps(data)
                     [ip, port, [data]] = data
                     # Send message

@@ -164,21 +164,21 @@ class GlobalInit:
             # to talk to the IMC server. These must be added to the router.
             # {proc_name: (q, q), ...}
             self.__imc_queues = {}
-            for proc in self.__local[1]:   
+            for proc in self.__remote[1]:   
                 q1 = mp.Queue()
                 q2 = mp.Queue()
                 self.__imc_queues[proc[0]] = (q1, q2)
             # Special control q to send control messages
             self.__imc_ctl_q = mp.Queue()
             # Create and start the IMC process            
-            #self.__imc = mp.Process(target=imc_server.ImcServer(ports, queues, self.__imc_ctl_q).run)
-            #self.__imc.start()
+            self.__imc = mp.Process(target=imc_server.ImcServer(ports, self.__imc_queues, self.__imc_ctl_q).run)
+            self.__imc.start()
     
         #===================================================================
         # Return the startup objects
         return True, {LOCAL: self.__local,
                       REMOTE: self.__remote,
-                      'IMC-QS': self.__imc_queues
+                      'IMC': self.__imc_queues,
                       'PARENT': self.__q_local_parent,
                       'CHILDREN': self.__q_local_children,
                       'DICT': self.__mp_dict,
@@ -187,10 +187,10 @@ class GlobalInit:
     #==============================================================================================   
     # Call this at end of day
     def end_of_day(self):
-        #if self.__is_remote: 
+        if self.__is_remote: 
             # Send QUIT to imc control q
-        #    self.__imc_ctl_q.put("QUIT")
-        #    self.__imc.join()
+            self.__imc_ctl_q.put("QUIT")
+            self.__imc.join()
         pass
     
     #==============================================================================================      
@@ -236,6 +236,7 @@ class ProcessInit:
         self.__router.add_route(self.__local_procs[0], self.__local_procs[1])
 
         # Add IMC routes
+        print('Remote Procs ', self.__remote_procs)
         for desc in self.__remote_procs[1]:
             self.__router.add_route(self.__remote_procs[0], desc)
         
