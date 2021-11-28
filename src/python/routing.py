@@ -139,7 +139,28 @@ class Routing:
             return r, self.__imc_qs[r]
         else:
             return r, None
-    
+ 
+    # Is this task remote
+    def is_remote(self, task):
+        for process in routes[REMOTE]:
+            if task in process[1]:
+                return True
+        return False 
+        
+    # Return network address for given task
+    def address_for_task(self, task):
+        r = []
+        self.__lk.acquire()
+        # Can't directly iterate a proxy
+        # This is a simple work round as the dict is small
+        routes = copy.deepcopy(self.__routes)
+        for process in routes[REMOTE]:
+            # Process of the form [process-name, [tasks], IP, port-in, port-out]
+            if task in process[1]:
+                r = [process[2], process[3]]
+        self.__lk.release()
+        return r
+        
     # Return the descriptor for process or None
     def find_process(self, target, process):
         

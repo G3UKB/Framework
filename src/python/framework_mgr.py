@@ -236,7 +236,6 @@ class ProcessInit:
         self.__router.add_route(self.__local_procs[0], self.__local_procs[1])
 
         # Add IMC routes
-        print('Remote Procs ', self.__remote_procs)
         for desc in self.__remote_procs[1]:
             self.__router.add_route(self.__remote_procs[0], desc)
         

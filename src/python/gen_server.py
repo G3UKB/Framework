@@ -169,8 +169,13 @@ class GenServer:
             # Get the associated q for the task
             q = self.get_target(name)
             if q != None:
+                # Is this a remote target
+                if self.is_remote(name):
+                    ip, port = self.get_addr(name)
+                    msg = [name, [message, ip, port]]
+                else:
+                    msg = [name, message]
                 # Forward the message to the process q
-                msg = [name, message]
                 q.put(msg)
         else:
             # For this process
@@ -222,32 +227,33 @@ class GenServer:
        self.__td_man.rm_task_ref( name )
 
     def get_target(self, name):
-        # Which process or machine is the message destination
-        process, (_, data) = self.__router.process_for_task(name)
-        if process != None:
-            if data != None:
-                # We have a valid route on this machine
-                return data
-                # return 'WMC', data 
-        else:
-            # Check IPC
-            ipc_routes = self.__router.get_route("IPC")
-            # Of the form [[task,IP], [...]]
-            for item in data:
-                if item[0] == name:
-                    # Found task, return IP
-                    return 'IMC', item[1]
-            
+        # target is always a queue
+        # The q can be a a queue.Queue or a multiprocessing.Queue
+        # We don't care because the other end will know what to do.
+        # Form is [process-name, [in_q, out_q]]
+        try:
+            process, (_, q) = self.__router.process_for_task(name)
+            if process != None:
+                if q != None:
+                    # We have a valid route on this machine
+                    return q 
+                else:
+                    # No q to send to
+                    print("GenServer - destination %s found but no associated queue!" % (name))
+                    return None
+            else:
+                # Process not known
+                print("GenServer - destination %s not found in router table!" % (name))
+                return None
+        except Exception as e:
+            print ('Failed to get route for task %s returned, process: %s, q: %s' % (name, process, q))
+            return None
+    
+    def is_remote(self, name):
+        return self.__router.is_remote(name)
         
-        if process == None:
-            # Not known
-            print("GenServer - destination %s not found in router table!" % (name))
-            return None
-        elif q == None:
-            print("GenServer - destination %s found but no associated queue!" % (name))
-            return None
-        else:
-            return q
+    def get_addr(self, name):
+        return self.__router.address_for_task(name)
         
 # ====================================================================
 # PRIVATE

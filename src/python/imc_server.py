@@ -41,7 +41,7 @@ import td_manager
 # The imc task
 class ImcServer():
     
-    def __init__(self, ports, queues, ctl_q):
+    def __init__(self, router, ports, queues, ctl_q):
         super(ImcServer, self).__init__()
         
         # ports - are a list of ports on which to listen
@@ -54,6 +54,7 @@ class ImcServer():
         #       ["192,168.1.200", 10000, [data to be dispatched]]
         #   we send the data message to the given end point.
         
+        self.__router = router
         self.__qs = queues
         self.__ports = ports
         self.__ctl_q = ctl_q
@@ -84,14 +85,14 @@ class ImcServer():
             else:
                 for q in self.__qs.values():
                     try:
-                        data = q[0].get(block=False)
+                        data = q[1].get(block=False)
                     except Exception as err:
                         continue
-                    print('Got ', data)
-                    data = pickle.dumps(data)
-                    [ip, port, [data]] = data
+                    # Data is of the form [task-name, [message, ip, port]]
+                    task-name, [message, ip, port] = data
+                    message = pickle.dumps(message)
                     # Send message
-                    s.sendto(data, (ip, port))
+                    s.sendto(message, (ip, port))
             try:
                 data = self.__ctl_q.get(block=False)
                 if data =="QUIT":
