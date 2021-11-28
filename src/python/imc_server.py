@@ -77,14 +77,13 @@ class ImcServer():
                 # Data available
                 for s in r:
                     data, _ = s.recvfrom(512)
+                    # data is of the form [task, message]
                     data = pickle.loads(data)
-                    print('Got: ', data)
-                    # Expect enough info here to dispatch correctly
-                    # Need to think about this!!
-                    # Can run both on same machine as they loop back.
-                    [proc, data] = data
-                    # Dispatch on the output q
-                    self.__qs[proc][1].put(data)
+                    # Dispatch on the output q on all channels we have (there should only be one at present)
+                    # Someone needs to be listening on this q to dispatch the message to the correct task
+                    # TBD this should be in framework manager to listen and dispatch on a separate thread.
+                    for q in self.__qs.values():
+                        q[0].put(data)
             else:
                 for q in self.__qs.values():
                     try:
@@ -93,7 +92,7 @@ class ImcServer():
                         continue
                     # Data is of the form [task-name, [message, ip, port]]
                     task_name, [message, ip, port] = data
-                    message = pickle.dumps(message)
+                    message = pickle.dumps([task_name, message])
                     # Send message
                     self.__s.sendto(message, (ip, port))
             try:
