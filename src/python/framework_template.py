@@ -49,11 +49,12 @@ import imc_server
 
 class AppMain:
 
-    def __init__(self, local, remote, local_queues, multiproc_dict, multiproc_event):
+    def __init__(self, local, remote, imc_queues, local_queues, multiproc_dict, multiproc_event):
         
         # Save params
         self.__local = local
         self.__remote = remote
+        self.__imc_queues = imc_queues
         self.__local_queues = local_queues
         self.__multiproc_dict = multiproc_dict
         self.__multiproc_event = multiproc_event
@@ -63,7 +64,7 @@ class AppMain:
         
         # ======================================================
         # For each process we perform a process initialisation which does the boiler plate stuff
-        fm = framework_mgr.ProcessInit(self.__local, self.__remote, self.__local_queues, self.__multiproc_dict)
+        fm = framework_mgr.ProcessInit(self.__local, self.__remote, self.__imc_queues, self.__local_queues, self.__multiproc_dict)
         # Call start_of_day() to get the task data instance that tracks the tasks this instance creates and the
         # router instance that merges together the data about which process containes which tasks and the
         # associated queues for processes to communicate.
@@ -292,14 +293,14 @@ class AppMain:
 
 # =======================================================================================================
 # Run parent instance
-def run_parent_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
+def run_parent_process(ar_task_ids, ar_imc_ids, d_imc_qs, d_process_qs, mp_dict, mp_event):
     # Directly call the main template code
-    AppMain(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run()
+    AppMain(ar_task_ids, ar_imc_ids, d_imc_qs, d_process_qs, mp_dict, mp_event).run()
 
 # Run child instance
-def run_child_process(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event):
+def run_child_process(ar_task_ids, ar_imc_ids, d_imc_qs, d_process_qs, mp_dict, mp_event):
     # Run a separate instance of the main template code via multiprocessing
-    p = mp.Process(target=AppMain(ar_task_ids, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
+    p = mp.Process(target=AppMain(ar_task_ids, d_imc_qs, ar_imc_ids, d_process_qs, mp_dict, mp_event).run)
     p.start()
 
 # =======================================================================================================
@@ -336,11 +337,11 @@ def main(config_path):
     
     # The first process in the list should probably be the main process otherwise look for a specific name.
     # Start the main process via a thread.
-    t1 = threading.Thread(target=run_parent_process, args=(expanded_local_procs[0], remote_procs, q_local_parent, mp_dict, mp_event))
+    t1 = threading.Thread(target=run_parent_process, args=(expanded_local_procs[0], remote_procs, q_imc, q_local_parent, mp_dict, mp_event))
     t1.start()
     
     # Start any child processes via another thread.
-    t2 = threading.Thread(target=run_child_process, args=(expanded_local_procs[1], remote_procs, q_local_children['CHILD'], mp_dict, mp_event))
+    t2 = threading.Thread(target=run_child_process, args=(expanded_local_procs[1], remote_procs, q_imc, q_local_children['CHILD'], mp_dict, mp_event))
     t2.start()
     sleep(1)
     

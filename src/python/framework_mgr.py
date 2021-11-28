@@ -211,9 +211,10 @@ class GlobalInit:
 class ProcessInit:
     
     #==============================================================================================   
-    def __init__(self, local_procs, remote_procs, local_queues, mp_dict):
+    def __init__(self, local_procs, remote_procs, imc_queues, local_queues, mp_dict):
         self.__local_procs = local_procs
         self.__remote_procs = remote_procs
+        self.__imc_queues = imc_queues
         self.__local_queues = local_queues
         self.__mp_dict = mp_dict
         
@@ -230,7 +231,7 @@ class ProcessInit:
         self.__fwds.start()
     
         # Make a router
-        self.__router = routing.Routing(self.__mp_dict, self.__local_queues)
+        self.__router = routing.Routing(self.__mp_dict, self.__local_queues, self.__imc_queues)
         # Add routes for this process
         self.__router.add_route(self.__local_procs[0], self.__local_procs[1])
 

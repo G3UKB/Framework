@@ -53,7 +53,7 @@ from defs import *
 
 class Routing:
     
-    def __init__(self, router, qs):
+    def __init__(self, router, local_qs, imc_qs):
         
         # Router is the single instance of the shared router dictionary
         # Queues are defined as follows:
@@ -62,7 +62,8 @@ class Routing:
         # For remote targets there is only one q which is the local q to send to the imc_server
         self.__routes = router
         self.__lk = Lock()
-        self.__qs = qs
+        self.__local_qs = local_qs
+        self.__imc_qs = imc_qs
     
     # Add a new route    
     def add_route(self, target, desc):
@@ -97,8 +98,10 @@ class Routing:
             if d != None:
                 r = d
         self.__lk.release()
-        if process in self.__qs:
-            return r, self.__qs[process]
+        if process in self.__local_qs:
+            return r, self.__local_qs[process]
+        elif process in self.__imc_qs:
+                return r, self.__imc_qs[process]
         else:
             return r, None
     
@@ -108,7 +111,7 @@ class Routing:
         self.__lk.acquire()
         r = self.__routes
         self.__lk.release()
-        return r, self.__qs
+        return r, self.__local_qs, self.__imc_qs
     
     # Return process and Q for given task
     # The process could be this process, another on this machine or a remote machine
@@ -130,8 +133,10 @@ class Routing:
                     r = process[0]
                     break
         self.__lk.release()
-        if r in self.__qs:
-            return r, self.__qs[r]
+        if r in self.__local_qs:
+            return r, self.__local_qs[r]
+        elif r in self.__imc_qs:
+            return r, self.__imc_qs[r]
         else:
             return r, None
     
