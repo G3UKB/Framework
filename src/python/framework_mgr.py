@@ -36,6 +36,7 @@ import td_manager
 import routing
 import forwarder
 import imc_server
+import imc_dispatcher
 import gen_server as gs
 
 """
@@ -230,6 +231,10 @@ class ProcessInit:
         self.__fwds = forwarder.FwdServer(self.__td_man, self.__local_queues)
         self.__fwds.start()
     
+        # Make and run a imc dispatcher
+        self.__imc_disp = imc_dispatcher.ImcDispatcher(self.__td_man, self.__imc_queues[0])
+        self.__imc_disp.start()
+        
         # Make a router
         self.__router = routing.Routing(self.__mp_dict, self.__local_queues, self.__imc_queues)
         # Add routes for this process
