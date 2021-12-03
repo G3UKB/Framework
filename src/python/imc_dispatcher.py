@@ -40,10 +40,10 @@ import td_manager
 # The IMC dispatcher task
 class ImcDispatcher(threading.Thread):
     
-    def __init__(self, td_man, q):
+    def __init__(self, td_man, qs):
         super(ImcDispatcher, self).__init__()
         self.__td_man = td_man
-        self.__q = q
+        self.__qs = qs
         self.__term = False
         
     def terminate(self):
@@ -51,13 +51,15 @@ class ImcDispatcher(threading.Thread):
         
     def run(self):
         while not self.__term:
-            try:
-                item = q.get(block=False)
-                # Process message
-                self.__process(item)
-            except queue.Empty:
-                continue
-        sleep(0.05)
+            # Monitor all output q's from the IMC Server
+            for (q, _) in self.__qs.values():
+                try:
+                    item = q.get(block=False)
+                    # Process message
+                    self.__process(item)
+                except queue.Empty:
+                    continue
+            sleep(0.05)
         print("ImcDispatcher terminating...")
             
     def __process(self, msg):
@@ -68,7 +70,7 @@ class ImcDispatcher(threading.Thread):
         item = self.__td_man.get_task_ref(name)
         if item == None:
             # No destination so give to forward server
-            print("FwdServer - destination %s not found!" % (name))
+            print("ImcDispatcher - destination %s not found!" % (name))
         else:
             # Dispatch
             _, d, q = item

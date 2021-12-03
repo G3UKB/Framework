@@ -232,7 +232,7 @@ class ProcessInit:
         self.__fwds.start()
     
         # Make and run a imc dispatcher
-        self.__imc_disp = imc_dispatcher.ImcDispatcher(self.__td_man, self.__imc_queues[0])
+        self.__imc_disp = imc_dispatcher.ImcDispatcher(self.__td_man, self.__imc_queues)
         self.__imc_disp.start()
         
         # Make a router
@@ -255,4 +255,6 @@ class ProcessInit:
     def end_of_day(self):
         self.__fwds.terminate()
         self.__fwds.join()
+        self.__imc_disp.terminate()
+        self.__imc_disp.join()
     
