@@ -50,7 +50,7 @@ class ImcServer():
         # Process:
         #   is to listen on the given ports. If data is received it is sent on the output q
         #       to the destination process. Message is [dest_proc, data].
-        #   is the monitor the input q where data will be of the form:
+        #   is to monitor the input q where data will be of the form:
         #       ["192,168.1.200", 10000, [data to be dispatched]]
         #   we send the data message to the given end point.
         
@@ -79,11 +79,13 @@ class ImcServer():
                     data, _ = s.recvfrom(512)
                     # data is of the form [task, message]
                     data = pickle.loads(data)
+                    print('Got data from socket ', data)
                     # Dispatch on the output q on all channels we have (there should only be one at present)
                     # Someone needs to be listening on this q to dispatch the message to the correct task
                     # TBD this should be in framework manager to listen and dispatch on a separate thread.
                     for q in self.__qs.values():
                         q[0].put(data)
+                        print('Dispatched on q ', q[0])
             else:
                 for q in self.__qs.values():
                     try:
@@ -91,10 +93,12 @@ class ImcServer():
                     except Exception as err:
                         continue
                     # Data is of the form [task-name, [message, ip, port]]
+                    print('Got data from q ', data)
                     task_name, [message, ip, port] = data
                     message = pickle.dumps([task_name, message])
                     # Send message
                     self.__s.sendto(message, (ip, port))
+                    print('Sent data to ', ip, port)
             try:
                 data = self.__ctl_q.get(block=False)
                 if data =="QUIT":
